@@ -43,4 +43,3 @@ Harmonic Beacon is a mobile application designed to reduce global stress and fos
 - **Meditate**: Library of guided sessions playing over the beacon
 - **Sessions**: Health tracking (Heart Rate, HRV) integration
 - **Authentication**: User accounts and session management
-```
