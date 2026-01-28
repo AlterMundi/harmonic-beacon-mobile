@@ -1,161 +1,225 @@
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioVisualizer } from '../../components/AudioVisualizer';
 import { useAudio } from '../../context/AudioContext';
 import Slider from '@react-native-community/slider';
-import { WebView } from 'react-native-webview';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Play, Pause } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import { useEffect } from 'react';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Local ambient video - place your beacon footage in assets/video/
+// Name your file: beacon_ambient.mp4
+const AMBIENT_VIDEO = require('../../assets/video/beacon_ambient.mp4');
 
 export default function LiveScreen() {
     const { isPlaying, isBuffering, togglePlay, volume, setVolume } = useAudio();
 
+    // Create video player with expo-video
+    const player = useVideoPlayer(AMBIENT_VIDEO, player => {
+        player.loop = true;
+        player.muted = true;
+        player.play();
+    });
+
     return (
-        <LinearGradient
-            colors={Colors.background.secondary ? [Colors.background.default, Colors.background.secondary] : ['#0a0a1a', '#12122a']}
-            style={styles.container}
-        >
+        <View style={styles.container}>
+            {/* Full-screen background video */}
+            <VideoView
+                player={player}
+                style={styles.backgroundVideo}
+                contentFit="cover"
+                nativeControls={false}
+            />
+
+            {/* Gradient overlay for readability */}
+            <LinearGradient
+                colors={['rgba(10, 10, 26, 0.3)', 'rgba(10, 10, 26, 0.7)', 'rgba(10, 10, 26, 0.95)']}
+                style={styles.gradientOverlay}
+            />
+
+            {/* Content */}
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.content}>
-                    <Text style={styles.headerTitle}>Harmonic Beacon</Text>
-                    <Text style={styles.headerSubtitle}>Live Resonance</Text>
-
-                    {/* Lofi Girl Video (Visuals only, audio managed separately via AudioContext) */}
-                    <View style={styles.videoContainer}>
-                        <WebView
-                            style={styles.webView}
-                            javaScriptEnabled={true}
-                            domStorageEnabled={true}
-                            source={{ uri: "https://www.youtube.com/embed/jfKfPfyJRdk?controls=0&showinfo=0&autoplay=1&mute=1&loop=1&playlist=jfKfPfyJRdk" }}
-                            scrollEnabled={false}
-                        />
+                    {/* Header */}
+                    <View style={styles.header}>
                         <View style={styles.liveBadge}>
                             <View style={styles.liveDot} />
                             <Text style={styles.liveText}>LIVE</Text>
                         </View>
+                        <Text style={styles.headerTitle}>Harmonic Beacon</Text>
+                        <Text style={styles.headerSubtitle}>Tune into the global frequency</Text>
                     </View>
+
+                    {/* Spacer to push controls down */}
+                    <View style={{ flex: 1 }} />
 
                     {/* Audio Visualizer */}
                     <View style={styles.visualizerContainer}>
-                        <AudioVisualizer isPlaying={isPlaying} barCount={6} />
+                        <AudioVisualizer isPlaying={isPlaying} barCount={8} />
                     </View>
 
-                    {/* Controls */}
-                    <View style={styles.controlsContainer}>
+                    {/* Play Button */}
+                    <View style={styles.playBtnContainer}>
+                        <TouchableOpacity onPress={togglePlay} style={styles.mainPlayBtn}>
+                            {isPlaying ? (
+                                <Pause size={32} color="white" />
+                            ) : (
+                                <Play size={32} color="white" style={{ marginLeft: 4 }} />
+                            )}
+                        </TouchableOpacity>
+                        <Text style={styles.statusText}>
+                            {isBuffering ? "Connecting to Beacon..." : isPlaying ? "Live Resonance Active" : "Tap to Connect"}
+                        </Text>
+                    </View>
+
+                    {/* Controls Card */}
+                    <BlurView intensity={40} tint="dark" style={styles.controlsCard}>
                         <Text style={styles.controlLabel}>Beacon Volume</Text>
                         <View style={styles.sliderRow}>
                             <Text style={styles.volIcon}>🔈</Text>
                             <Slider
-                                style={{ width: '100%', height: 40, flex: 1 }}
+                                style={{ flex: 1, height: 40 }}
                                 minimumValue={0}
                                 maximumValue={1}
                                 value={volume}
                                 onValueChange={setVolume}
-                                minimumTrackTintColor={Colors.primary[500]}
-                                maximumTrackTintColor={Colors.border.subtle}
-                                thumbTintColor={Colors.primary[400]}
+                                minimumTrackTintColor={Colors.primary[400]}
+                                maximumTrackTintColor="rgba(255,255,255,0.2)"
+                                thumbTintColor="#ffffff"
                             />
                             <Text style={styles.volIcon}>🔊</Text>
                         </View>
 
-                        <View style={styles.playBtnContainer}>
-                            <TouchableOpacity onPress={togglePlay} style={styles.mainPlayBtn}>
-                                {isPlaying ? <Pause size={24} color="white" /> : <Play size={24} color="white" style={{ marginLeft: 4 }} />}
-                            </TouchableOpacity>
-                            <Text style={styles.statusText}>
-                                {isBuffering ? "Buffering..." : isPlaying ? "Pause Beacon Audio" : "Play Beacon Audio"}
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoText}>
+                                🌍 Deep Calm Session • Reduces stress & improves sleep
                             </Text>
                         </View>
-                    </View>
-
-                    <View style={styles.infoCard}>
-                        <Text style={styles.infoTitle}>Deep Calm Session</Text>
-                        <Text style={styles.infoText}>
-                            Tune into the global frequency. This live resonance helps reduce stress and improve sleep quality.
-                        </Text>
-                    </View>
+                    </BlurView>
                 </View>
             </SafeAreaView>
-        </LinearGradient>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#0a0a1a',
+    },
+    backgroundVideo: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: width,
+        height: height,
+    },
+    gradientOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     safeArea: {
         flex: 1,
     },
     content: {
-        padding: 24,
         flex: 1,
+        padding: 24,
+    },
+    header: {
+        alignItems: 'center',
+        paddingTop: 20,
+    },
+    liveBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    liveDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#ef4444',
+    },
+    liveText: {
+        color: '#ef4444',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 1,
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 36,
         fontWeight: '700',
         color: Colors.text.primary,
+        textAlign: 'center',
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 10,
     },
     headerSubtitle: {
         fontSize: 16,
         color: Colors.text.secondary,
-        marginBottom: 32,
-    },
-    videoContainer: {
-        width: '100%',
-        height: width * 0.56, // 16:9 
-        backgroundColor: '#000',
-        borderRadius: 16,
-        overflow: 'hidden',
-        marginBottom: 24,
-        borderWidth: 1,
-        borderColor: Colors.border.subtle,
-    },
-    webView: {
-        flex: 1,
-        opacity: 0.8,
-    },
-    liveBadge: {
-        position: 'absolute',
-        top: 12,
-        left: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-        gap: 6,
-    },
-    liveDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#ef4444',
-    },
-    liveText: {
-        color: 'white',
-        fontSize: 10,
-        fontWeight: '700',
-        letterSpacing: 0.5,
+        textAlign: 'center',
+        marginTop: 8,
     },
     visualizerContainer: {
-        height: 60,
+        height: 80,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 24,
     },
-    controlsContainer: {
+    playBtnContainer: {
+        alignItems: 'center',
         marginBottom: 32,
+    },
+    mainPlayBtn: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(99, 70, 255, 0.8)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: Colors.primary[500],
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 20,
+        elevation: 10,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    statusText: {
+        color: Colors.text.secondary,
+        fontSize: 14,
+        fontWeight: '500',
+        marginTop: 16,
+    },
+    controlsCard: {
+        borderRadius: 24,
+        padding: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     controlLabel: {
         color: Colors.text.secondary,
-        fontSize: 14,
+        fontSize: 12,
         marginBottom: 8,
         fontWeight: '500',
+        textAlign: 'center',
     },
     sliderRow: {
         flexDirection: 'row',
@@ -163,47 +227,17 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     volIcon: {
-        fontSize: 16,
-    },
-    playBtnContainer: {
-        alignItems: 'center',
-        marginTop: 8,
-        gap: 12,
-    },
-    mainPlayBtn: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: Colors.primary[600],
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: Colors.primary[500],
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 6,
-    },
-    statusText: {
-        color: Colors.primary[300],
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    infoCard: {
-        backgroundColor: Colors.background.card,
-        padding: 20,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.border.subtle,
-    },
-    infoTitle: {
         fontSize: 18,
-        fontWeight: '600',
-        color: Colors.text.primary,
-        marginBottom: 8,
+    },
+    infoRow: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
     },
     infoText: {
-        fontSize: 14,
-        color: Colors.text.secondary,
-        lineHeight: 22,
+        fontSize: 13,
+        color: Colors.text.muted,
+        textAlign: 'center',
     },
 });

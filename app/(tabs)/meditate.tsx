@@ -38,6 +38,24 @@ export default function MeditateScreen() {
     } = useAudio();
 
     const [activeMeditation, setActiveMeditation] = useState<any>(null);
+    const [mixValue, setMixValue] = useState(0.5); // 0 = beacon only, 0.5 = equal, 1 = meditation only
+
+    // Handle mix slider changes - converts single slider to two volumes
+    const handleMixChange = (value: number) => {
+        setMixValue(value);
+        // Center (0.5) = both at full volume
+        // Left (0) = beacon full, meditation silent
+        // Right (1) = meditation full, beacon silent
+        if (value <= 0.5) {
+            // Left side: beacon stays at 1, meditation fades
+            setBeaconVolume(1.0);
+            setMeditationVolume(value * 2); // 0→0, 0.5→1
+        } else {
+            // Right side: meditation stays at 1, beacon fades
+            setMeditationVolume(1.0);
+            setBeaconVolume((1 - value) * 2); // 0.5→1, 1→0
+        }
+    };
 
     const startMeditation = async (item: any) => {
         if (activeMeditation?.id === item.id) {
@@ -135,33 +153,22 @@ export default function MeditateScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Sliders */}
+                        {/* Mix Slider */}
                         <View style={styles.sliders}>
-                            <View>
-                                <Text style={styles.sliderLabel}>Meditation Volume</Text>
+                            <Text style={styles.sliderLabel}>Audio Mix</Text>
+                            <View style={styles.mixSliderContainer}>
+                                <Text style={styles.mixLabel}>🎸 Beacon</Text>
                                 <Slider
-                                    style={{ width: '100%', height: 40 }}
+                                    style={{ flex: 1, height: 40 }}
                                     minimumValue={0}
                                     maximumValue={1}
-                                    value={meditationVolume}
-                                    onValueChange={setMeditationVolume}
-                                    minimumTrackTintColor={Colors.accent[400]}
-                                    maximumTrackTintColor={Colors.border.subtle}
-                                    thumbTintColor={Colors.accent[500]}
-                                />
-                            </View>
-                            <View>
-                                <Text style={styles.sliderLabel}>Beacon Ambience</Text>
-                                <Slider
-                                    style={{ width: '100%', height: 40 }}
-                                    minimumValue={0}
-                                    maximumValue={1}
-                                    value={beaconVolume}
-                                    onValueChange={setBeaconVolume}
+                                    value={mixValue}
+                                    onValueChange={handleMixChange}
                                     minimumTrackTintColor={Colors.primary[500]}
-                                    maximumTrackTintColor={Colors.border.subtle}
-                                    thumbTintColor={Colors.primary[400]}
+                                    maximumTrackTintColor={Colors.accent[400]}
+                                    thumbTintColor="#ffffff"
                                 />
+                                <Text style={styles.mixLabel}>🧘 Voice</Text>
                             </View>
                         </View>
                     </BlurView>
@@ -232,10 +239,11 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        minHeight: 300,
+        minHeight: 380,
         borderTopLeftRadius: 32,
         borderTopRightRadius: 32,
         padding: 24,
+        paddingBottom: 100,
         overflow: 'hidden',
         borderTopWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
@@ -282,7 +290,18 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: Colors.text.muted,
         marginLeft: 4,
-        marginBottom: -8,
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    mixSliderContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+    },
+    mixLabel: {
+        fontSize: 12,
+        color: Colors.text.secondary,
     },
     progressContainer: {
         marginBottom: 24,
