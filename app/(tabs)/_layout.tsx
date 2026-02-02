@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
-import { Radio, Moon, Heart } from 'lucide-react-native'; // Using Lucide icons
+import { Radio, Moon, Heart, User } from 'lucide-react-native'; // Using Lucide icons
 import { Colors } from '../../constants/Colors';
 import { BlurView } from 'expo-blur';
 
@@ -66,6 +66,16 @@ export default function TabLayout() {
                     title: 'Sessions',
                     tabBarIcon: ({ color, size }) => (
                         <Heart size={size} color={color} />
+                    ),
+                }}
+            />
+
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: 'Profile',
+                    tabBarIcon: ({ color, size }) => (
+                        <User size={size} color={color} />
                     ),
                 }}
             />

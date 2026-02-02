@@ -51,8 +51,8 @@ export default function LiveScreen() {
                             <View style={styles.liveDot} />
                             <Text style={styles.liveText}>LIVE</Text>
                         </View>
-                        <Text style={styles.headerTitle}>Harmonic Beacon</Text>
-                        <Text style={styles.headerSubtitle}>Tune into the global frequency</Text>
+                        <Text style={[styles.headerTitle, { marginTop: 10 }]}>Harmonic Beacon</Text>
+                        {/* <Text style={styles.headerSubtitle}>Tune into the global frequency</Text> */}
                     </View>
 
                     {/* Spacer to push controls down */}
@@ -72,35 +72,17 @@ export default function LiveScreen() {
                                 <Play size={32} color="white" style={{ marginLeft: 4 }} />
                             )}
                         </TouchableOpacity>
-                        <Text style={styles.statusText}>
+                        <Text style={[styles.statusDetailText, { marginTop: 20 }]}>
                             {isBuffering ? "Connecting to Beacon..." : isPlaying ? "Live Resonance Active" : "Tap to Connect"}
                         </Text>
                     </View>
 
-                    {/* Controls Card */}
-                    <BlurView intensity={40} tint="dark" style={styles.controlsCard}>
-                        <Text style={styles.controlLabel}>Beacon Volume</Text>
-                        <View style={styles.sliderRow}>
-                            <Text style={styles.volIcon}>🔈</Text>
-                            <Slider
-                                style={{ flex: 1, height: 40 }}
-                                minimumValue={0}
-                                maximumValue={1}
-                                value={volume}
-                                onValueChange={setVolume}
-                                minimumTrackTintColor={Colors.primary[400]}
-                                maximumTrackTintColor="rgba(255,255,255,0.2)"
-                                thumbTintColor="#ffffff"
-                            />
-                            <Text style={styles.volIcon}>🔊</Text>
-                        </View>
-
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoText}>
-                                🌍 Deep Calm Session • Reduces stress & improves sleep
-                            </Text>
-                        </View>
-                    </BlurView>
+                    {/* Status Text (Moved from inside removed card) */}
+                    <View style={styles.statusContainer}>
+                        <Text style={styles.statusDetailText}>
+                            {/* 🌍 Deep Calm Session • Reduces stress & improves sleep */}
+                        </Text>
+                    </View>
                 </View>
             </SafeAreaView>
         </View>
@@ -207,37 +189,15 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginTop: 16,
     },
-    controlsCard: {
-        borderRadius: 24,
-        padding: 20,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    controlLabel: {
-        color: Colors.text.secondary,
-        fontSize: 12,
-        marginBottom: 8,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-    sliderRow: {
-        flexDirection: 'row',
+    statusContainer: {
+        marginTop: 'auto',
+        paddingBottom: 20,
         alignItems: 'center',
-        gap: 12,
     },
-    volIcon: {
-        fontSize: 18,
-    },
-    infoRow: {
-        marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.1)',
-    },
-    infoText: {
+    statusDetailText: {
         fontSize: 13,
         color: Colors.text.muted,
         textAlign: 'center',
+        fontStyle: 'italic',
     },
 });

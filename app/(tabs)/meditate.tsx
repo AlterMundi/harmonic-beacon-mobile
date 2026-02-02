@@ -16,9 +16,9 @@ const AudioAssets = {
 };
 
 const meditations = [
-    { id: '1', title: "La Mosca", duration: "15 min", color: ['#4c1d95', '#2563eb'] },
-    { id: '2', title: "Humanosfera", duration: "15 min", color: ['#4338ca', '#6b21a8'] },
-    { id: '3', title: "El Amor", duration: "15 min", color: ['#e11d48', '#db2777'] }
+    { id: '1', title: "La Mosca", duration: "0:52", color: ['#4c1d95', '#2563eb'] },
+    { id: '2', title: "Humanosfera", duration: "2:03", color: ['#4338ca', '#6b21a8'] },
+    { id: '3', title: "El Amor", duration: "4:35", color: ['#e11d48', '#db2777'] }
 ];
 
 export default function MeditateScreen() {
@@ -43,17 +43,22 @@ export default function MeditateScreen() {
     // Handle mix slider changes - converts single slider to two volumes
     const handleMixChange = (value: number) => {
         setMixValue(value);
-        // Center (0.5) = both at full volume
+        // Center (0.5) = Meditation at 1.0, Beacon slightly lower (0.85) to favor meditation
         // Left (0) = beacon full, meditation silent
         // Right (1) = meditation full, beacon silent
         if (value <= 0.5) {
-            // Left side: beacon stays at 1, meditation fades
-            setBeaconVolume(1.0);
-            setMeditationVolume(value * 2); // 0→0, 0.5→1
+            // 0 -> Beacon 1.0, Med 0.0
+            // 0.5 -> Beacon 0.85, Med 1.0
+            const beaconVol = 1.0 - (value * 0.3); // 0 -> 1.0, 0.5 -> 0.85
+            const medVol = value * 2; // 0 -> 0, 0.5 -> 1.0
+            setBeaconVolume(beaconVol);
+            setMeditationVolume(medVol);
         } else {
-            // Right side: meditation stays at 1, beacon fades
+            // 0.5 -> Med 1.0, Beacon 0.85
+            // 1.0 -> Med 1.0, Beacon 0.0
+            const beaconVol = (1 - value) * 1.7; // 0.5 -> 0.85, 1.0 -> 0
             setMeditationVolume(1.0);
-            setBeaconVolume((1 - value) * 2); // 0.5→1, 1→0
+            setBeaconVolume(beaconVol);
         }
     };
 
@@ -80,7 +85,7 @@ export default function MeditateScreen() {
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView contentContainerStyle={styles.content}>
                     <Text style={styles.headerTitle}>Meditation</Text>
-                    <Text style={styles.headerSubtitle}>Guided sessions</Text>
+                    <Text style={styles.headerSubtitle}>Audio Overlays</Text>
 
                     {/* Cards */}
                     <View style={[styles.cardList, activeMeditation ? { paddingBottom: 220 } : {}]}>
@@ -100,7 +105,7 @@ export default function MeditateScreen() {
                                 </LinearGradient>
                                 <View style={styles.cardInfo}>
                                     <Text style={styles.cardTitle}>{item.title}</Text>
-                                    <Text style={styles.cardSubtitle}>Guided Session • {item.duration}</Text>
+                                    <Text style={styles.cardSubtitle}>Short Story • {item.duration}</Text>
                                 </View>
                             </TouchableOpacity>
                         ))}

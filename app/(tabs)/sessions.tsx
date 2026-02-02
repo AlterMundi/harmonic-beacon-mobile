@@ -12,7 +12,7 @@ export default function SessionsScreen() {
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.content}>
                     <Text style={styles.headerTitle}>Sessions</Text>
-                    <Text style={styles.headerSubtitle}>Track your wellness</Text>
+                    <Text style={styles.headerSubtitle}>Track your Journey</Text>
 
                     <View style={styles.connectCard}>
                         <View style={styles.connectIcon}>
@@ -33,7 +33,7 @@ export default function SessionsScreen() {
                         <Text style={styles.emptyText}>Listen to the beacon and track your heart rate variability in real-time.</Text>
 
                         <TouchableOpacity style={styles.startBtn}>
-                            <Text style={styles.startBtnText}>Begin Solo Session</Text>
+                            <Text style={styles.startBtnText}>Begin Session</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
