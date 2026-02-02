@@ -34,7 +34,7 @@ yarn-error.*
 .env*.local
 .env
 
-# sensitive config files with API keys
+# config files
 lib/supabase.ts
 
 # typescript
