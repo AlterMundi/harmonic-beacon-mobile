@@ -13,7 +13,6 @@ export default function RootLayout() {
                     <StatusBar style="light" />
                     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background.default } }}>
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                     </Stack>
                 </View>
             </AudioProvider>

@@ -19,7 +19,8 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app does not use the camera.",
-        "NSMicrophoneUsageDescription": "Required for WebRTC audio sessions with the live beacon."
+        "NSMicrophoneUsageDescription": "Required for WebRTC audio sessions with the live beacon.",
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
@@ -29,7 +30,10 @@
       },
       "package": "com.altermundi.harmonicbeacon",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "foregroundService": {
+        "type": "mediaPlayback"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,7 +42,8 @@
       "expo-router",
       "expo-font",
       "expo-apple-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@livekit/react-native-webrtc"
     ],
     "extra": {
       "eas": {

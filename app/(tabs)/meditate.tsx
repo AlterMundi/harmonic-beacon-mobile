@@ -34,7 +34,10 @@ export default function MeditateScreen() {
         seekMeditation,
         meditationSound,
         volume: beaconVolume,
-        setVolume: setBeaconVolume
+        setVolume: setBeaconVolume,
+        beaconConnected,
+        beaconReconnecting,
+        connectBeacon,
     } = useAudio();
 
     const [activeMeditation, setActiveMeditation] = useState<any>(null);
@@ -67,6 +70,12 @@ export default function MeditateScreen() {
             toggleMeditation();
         } else {
             setActiveMeditation(item);
+
+            // Auto-connect beacon if not already connected
+            if (!beaconConnected) {
+                await connectBeacon();
+            }
+
             // @ts-ignore
             await loadMeditation(AudioAssets[item.id]);
         }
@@ -75,6 +84,19 @@ export default function MeditateScreen() {
     const stopSession = async () => {
         await unloadMeditation();
         setActiveMeditation(null);
+    };
+
+    // Beacon connection status text
+    const getBeaconStatusText = () => {
+        if (beaconReconnecting) return 'Beacon: Reconnecting...';
+        if (beaconConnected) return 'Beacon: Connected';
+        return 'Beacon: Disconnected';
+    };
+
+    const getBeaconStatusColor = () => {
+        if (beaconReconnecting) return '#f59e0b';
+        if (beaconConnected) return Colors.primary[300];
+        return Colors.text.muted;
     };
 
     return (
@@ -105,7 +127,7 @@ export default function MeditateScreen() {
                                 </LinearGradient>
                                 <View style={styles.cardInfo}>
                                     <Text style={styles.cardTitle}>{item.title}</Text>
-                                    <Text style={styles.cardSubtitle}>Short Story • {item.duration}</Text>
+                                    <Text style={styles.cardSubtitle}>Short Story {item.duration}</Text>
                                 </View>
                             </TouchableOpacity>
                         ))}
@@ -119,6 +141,9 @@ export default function MeditateScreen() {
                             <View>
                                 <Text style={styles.playerTitle}>{activeMeditation.title}</Text>
                                 <Text style={styles.playerSubtitle}>Playing with Live Beacon</Text>
+                                <Text style={[styles.beaconStatus, { color: getBeaconStatusColor() }]}>
+                                    {getBeaconStatusText()}
+                                </Text>
                             </View>
                             <TouchableOpacity onPress={stopSession} style={styles.closeBtn}>
                                 <X color="white" size={24} />
@@ -162,7 +187,7 @@ export default function MeditateScreen() {
                         <View style={styles.sliders}>
                             <Text style={styles.sliderLabel}>Audio Mix</Text>
                             <View style={styles.mixSliderContainer}>
-                                <Text style={styles.mixLabel}>🎸 Beacon</Text>
+                                <Text style={styles.mixLabel}>Beacon</Text>
                                 <Slider
                                     style={{ flex: 1, height: 40 }}
                                     minimumValue={0}
@@ -173,7 +198,7 @@ export default function MeditateScreen() {
                                     maximumTrackTintColor={Colors.accent[400]}
                                     thumbTintColor="#ffffff"
                                 />
-                                <Text style={styles.mixLabel}>🧘 Voice</Text>
+                                <Text style={styles.mixLabel}>Voice</Text>
                             </View>
                         </View>
                     </BlurView>
@@ -268,6 +293,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: Colors.primary[300],
         marginTop: 4,
+    },
+    beaconStatus: {
+        fontSize: 12,
+        marginTop: 4,
+        fontStyle: 'italic',
     },
     closeBtn: {
         padding: 4,

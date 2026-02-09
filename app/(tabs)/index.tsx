@@ -1,23 +1,56 @@
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioVisualizer } from '../../components/AudioVisualizer';
 import { useAudio } from '../../context/AudioContext';
-import Slider from '@react-native-community/slider';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Play, Pause } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 const { width, height } = Dimensions.get('window');
 
 // Local ambient video - place your beacon footage in assets/video/
-// Name your file: beacon_ambient.mp4
 const AMBIENT_VIDEO = require('../../assets/video/beacon_ambient.mp4');
 
 export default function LiveScreen() {
-    const { isPlaying, isBuffering, togglePlay, volume, setVolume } = useAudio();
+    const {
+        isPlaying,
+        isBuffering,
+        beaconConnected,
+        beaconReconnecting,
+        togglePlay,
+        connectBeacon,
+        disconnectBeacon,
+        volume,
+        setVolume,
+    } = useAudio();
+
+    // Pulsing animation for reconnecting state
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        if (beaconReconnecting) {
+            const pulse = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, {
+                        toValue: 0.3,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(pulseAnim, {
+                        toValue: 1,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            pulse.start();
+            return () => pulse.stop();
+        } else {
+            pulseAnim.setValue(1);
+        }
+    }, [beaconReconnecting, pulseAnim]);
 
     // Create video player with expo-video
     const player = useVideoPlayer(AMBIENT_VIDEO, player => {
@@ -25,6 +58,55 @@ export default function LiveScreen() {
         player.muted = true;
         player.play();
     });
+
+    // Handle the main button press
+    const handleMainButton = async () => {
+        if (!beaconConnected && !isBuffering) {
+            // Not connected yet -- connect
+            await connectBeacon();
+        } else if (beaconConnected) {
+            // Connected -- toggle play/pause (mute/unmute)
+            await togglePlay();
+        }
+        // If buffering, do nothing (already connecting)
+    };
+
+    // Determine status text
+    const getStatusText = () => {
+        if (isBuffering) return 'Connecting to Beacon...';
+        if (beaconReconnecting) return 'Reconnecting...';
+        if (beaconConnected && isPlaying) return 'Live Resonance Active';
+        if (beaconConnected && !isPlaying) return 'Beacon Paused';
+        return 'Tap to Connect';
+    };
+
+    // Determine badge style based on connection state
+    const getBadgeStyle = () => {
+        if (beaconReconnecting) {
+            return {
+                badgeBg: 'rgba(245, 158, 11, 0.2)',
+                badgeBorder: 'rgba(245, 158, 11, 0.4)',
+                dotColor: '#f59e0b',
+                textColor: '#f59e0b',
+            };
+        }
+        if (beaconConnected) {
+            return {
+                badgeBg: 'rgba(239, 68, 68, 0.2)',
+                badgeBorder: 'rgba(239, 68, 68, 0.4)',
+                dotColor: '#ef4444',
+                textColor: '#ef4444',
+            };
+        }
+        return {
+            badgeBg: 'rgba(255, 255, 255, 0.1)',
+            badgeBorder: 'rgba(255, 255, 255, 0.2)',
+            dotColor: 'rgba(255, 255, 255, 0.4)',
+            textColor: 'rgba(255, 255, 255, 0.4)',
+        };
+    };
+
+    const badge = getBadgeStyle();
 
     return (
         <View style={styles.container}>
@@ -47,12 +129,27 @@ export default function LiveScreen() {
                 <View style={styles.content}>
                     {/* Header */}
                     <View style={styles.header}>
-                        <View style={styles.liveBadge}>
-                            <View style={styles.liveDot} />
-                            <Text style={styles.liveText}>LIVE</Text>
+                        <View style={[
+                            styles.liveBadge,
+                            {
+                                backgroundColor: badge.badgeBg,
+                                borderColor: badge.badgeBorder,
+                            }
+                        ]}>
+                            <Animated.View
+                                style={[
+                                    styles.liveDot,
+                                    {
+                                        backgroundColor: badge.dotColor,
+                                        opacity: beaconReconnecting ? pulseAnim : 1,
+                                    },
+                                ]}
+                            />
+                            <Text style={[styles.liveText, { color: badge.textColor }]}>
+                                {beaconConnected ? 'LIVE' : beaconReconnecting ? 'RECONNECTING' : 'OFFLINE'}
+                            </Text>
                         </View>
                         <Text style={[styles.headerTitle, { marginTop: 10 }]}>Harmonic Beacon</Text>
-                        {/* <Text style={styles.headerSubtitle}>Tune into the global frequency</Text> */}
                     </View>
 
                     {/* Spacer to push controls down */}
@@ -60,27 +157,29 @@ export default function LiveScreen() {
 
                     {/* Audio Visualizer */}
                     <View style={styles.visualizerContainer}>
-                        <AudioVisualizer isPlaying={isPlaying} barCount={8} />
+                        <AudioVisualizer isPlaying={isPlaying && beaconConnected} barCount={8} />
                     </View>
 
                     {/* Play Button */}
                     <View style={styles.playBtnContainer}>
-                        <TouchableOpacity onPress={togglePlay} style={styles.mainPlayBtn}>
-                            {isPlaying ? (
+                        <TouchableOpacity onPress={handleMainButton} style={styles.mainPlayBtn}>
+                            {isPlaying && beaconConnected ? (
                                 <Pause size={32} color="white" />
                             ) : (
                                 <Play size={32} color="white" style={{ marginLeft: 4 }} />
                             )}
                         </TouchableOpacity>
                         <Text style={[styles.statusDetailText, { marginTop: 20 }]}>
-                            {isBuffering ? "Connecting to Beacon..." : isPlaying ? "Live Resonance Active" : "Tap to Connect"}
+                            {getStatusText()}
                         </Text>
                     </View>
 
-                    {/* Status Text (Moved from inside removed card) */}
+                    {/* Status Text */}
                     <View style={styles.statusContainer}>
                         <Text style={styles.statusDetailText}>
-                            {/* 🌍 Deep Calm Session • Reduces stress & improves sleep */}
+                            {beaconConnected && !beaconReconnecting
+                                ? 'WebRTC connected to beacon room'
+                                : ''}
                         </Text>
                     </View>
                 </View>
@@ -122,23 +221,19 @@ const styles = StyleSheet.create({
     liveBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(239, 68, 68, 0.2)',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
         gap: 6,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: 'rgba(239, 68, 68, 0.4)',
     },
     liveDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#ef4444',
     },
     liveText: {
-        color: '#ef4444',
         fontSize: 12,
         fontWeight: '700',
         letterSpacing: 1,
