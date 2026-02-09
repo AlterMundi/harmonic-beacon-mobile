@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 
 type AudioContextType = {
     isPlaying: boolean;
@@ -64,7 +64,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                 await Audio.setAudioModeAsync({
                     playsInSilentModeIOS: true,
                     staysActiveInBackground: true,
-                    shouldDuckAndroid: true,
+                    interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+                    interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+                    shouldDuckAndroid: false, // We control volumes ourselves via crossfader
+                    playThroughEarpieceAndroid: false,
                 });
                 loadSound();
             } catch (error) {

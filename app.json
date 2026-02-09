@@ -19,7 +19,7 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app does not use the camera.",
-        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+        "NSMicrophoneUsageDescription": "Required for WebRTC audio sessions with the live beacon."
       }
     },
     "android": {

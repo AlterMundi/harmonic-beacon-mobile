@@ -103,22 +103,8 @@ class BeaconService extends ChangeNotifier {
   Future<void> connect(String token) async {
     _room = Room();
 
-    _room!.addListener(_onRoomEvent);
-
-    await _room!.connect(_livekitUrl, token);
-    _isConnected = true;
-    notifyListeners();
-
-    // Check for existing participants
-    for (final participant in _room!.remoteParticipants.values) {
-      if (participant.identity == _beaconIdentity) {
-        _subscribeToParticipant(participant);
-      }
-    }
-  }
-
-  void _onRoomEvent(RoomEvent event) {
-    if (event is TrackSubscribedEvent) {
+    // livekit_client v2.x: use event-specific callbacks
+    _room!.on<TrackSubscribedEvent>((event) {
       final track = event.track;
       final participant = event.participant;
       if (track is RemoteAudioTrack && participant.identity == _beaconIdentity) {
@@ -126,15 +112,47 @@ class BeaconService extends ChangeNotifier {
         track.setVolume(_volume); // <-- THE KEY API
         notifyListeners();
       }
-    } else if (event is TrackUnsubscribedEvent) {
+    });
+
+    _room!.on<TrackUnsubscribedEvent>((event) {
       if (event.participant.identity == _beaconIdentity) {
         _beaconTrack = null;
         notifyListeners();
       }
-    } else if (event is RoomDisconnectedEvent) {
+    });
+
+    _room!.on<RoomDisconnectedEvent>((_) {
       _isConnected = false;
       _beaconTrack = null;
       notifyListeners();
+    });
+
+    _room!.on<RoomReconnectingEvent>((_) {
+      // UI can show reconnection indicator
+      notifyListeners();
+    });
+
+    _room!.on<RoomReconnectedEvent>((_) {
+      _isConnected = true;
+      notifyListeners();
+    });
+
+    await _room!.connect(_livekitUrl, token);
+    _isConnected = true;
+    notifyListeners();
+
+    // Check for existing participants (already in room before we joined)
+    for (final participant in _room!.remoteParticipants.values) {
+      if (participant.identity == _beaconIdentity) {
+        for (final trackPublication in participant.audioTrackPublications) {
+          final track = trackPublication.track;
+          if (track is RemoteAudioTrack) {
+            _beaconTrack = track;
+            track.setVolume(_volume);
+            notifyListeners();
+          }
+        }
+      }
     }
   }
 
@@ -148,7 +166,7 @@ class BeaconService extends ChangeNotifier {
 
   Future<void> disconnect() async {
     await _room?.disconnect();
-    _room?.removeListener(_onRoomEvent);
+    _room?.dispose();
     _room = null;
     _beaconTrack = null;
     _isConnected = false;
@@ -300,7 +318,39 @@ Future<void> configureAudioSession() async {
 }
 ```
 
-**Note on LiveKit interaction:** LiveKit's Flutter SDK may also configure the audio session. The `audio_session` package allows us to set our preferred configuration BEFORE LiveKit connects. LiveKit should respect `.mixWithOthers` if we set it first, but this needs testing.
+**Audio Session Conflict Mitigation (CRITICAL):**
+
+LiveKit's Flutter SDK may reconfigure the `AVAudioSession` to `.playAndRecord` when connecting, overriding our `.playback` + `mixWithOthers` config. Additionally, `.playAndRecord` defaults to earpiece output on iOS.
+
+**Required steps:**
+1. **Log the actual session state** after LiveKit connects:
+```dart
+final session = await AudioSession.instance;
+_room!.on<RoomConnectedEvent>((_) async {
+  final category = await session.configuration;
+  debugPrint('[AudioSession] Post-connect config: $category');
+});
+```
+
+2. **Re-apply audio config** after LiveKit connects:
+```dart
+_room!.on<RoomConnectedEvent>((_) async {
+  final session = await AudioSession.instance;
+  await session.configure(const AudioSessionConfiguration(
+    avAudioSessionCategory: AVAudioSessionCategory.playback,
+    avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.mixWithOthers,
+    avAudioSessionMode: AVAudioSessionMode.defaultMode,
+    androidAudioAttributes: AndroidAudioAttributes(
+      contentType: AndroidAudioContentType.music,
+      usage: AndroidAudioUsage.media,
+    ),
+    androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+  ));
+  debugPrint('[AudioSession] Re-applied mixWithOthers after LiveKit connected');
+});
+```
+
+3. **Test earpiece vs speaker**: If audio is barely audible after LiveKit connects, `.playAndRecord` may have defaulted to earpiece. Verify audio routes to speaker.
 
 ### Step 7: Background Audio with audio_service
 

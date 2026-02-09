@@ -116,17 +116,49 @@ registerGlobals();
 ### Step 4: Audio Session Coexistence
 
 ```typescript
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+
 // Initialize audio BEFORE LiveKit connects
 await Audio.setAudioModeAsync({
     playsInSilentModeIOS: true,
     staysActiveInBackground: true,
     // CRITICAL: allow mixing with WebRTC audio
-    interruptionModeIOS: Audio.InterruptionModeIOS.MixWithOthers,
-    interruptionModeAndroid: Audio.InterruptionModeAndroid.DuckOthers,
+    interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+    interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
     shouldDuckAndroid: false, // We control volumes ourselves
     playThroughEarpieceAndroid: false,
 });
 ```
+
+**Audio Session Conflict Mitigation (CRITICAL):**
+
+LiveKit's `react-native-webrtc` will reconfigure `AVAudioSession` to `.playAndRecord` when connecting, which may override our `MixWithOthers` setting. Additionally, `.playAndRecord` defaults to earpiece output, not speaker.
+
+**Required steps:**
+1. **Log the actual session state** after LiveKit connects to verify our config wasn't overridden:
+```typescript
+// After room.connect() resolves, log iOS audio session state
+// Use expo-av's Audio.getPermissionsAsync() or a native module to inspect
+console.log('[AudioSession] Post-connect state — verify MixWithOthers is active');
+```
+
+2. **Re-apply audio config** in the room connected callback:
+```typescript
+room.on(RoomEvent.Connected, async () => {
+    // Re-apply our audio session config — LiveKit may have overridden it
+    await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+    });
+    console.log('[AudioSession] Re-applied MixWithOthers after LiveKit connected');
+});
+```
+
+3. **Test earpiece vs speaker**: `.playAndRecord` defaults to earpiece on iOS. If audio is barely audible after LiveKit connects, this is why. Set `playThroughEarpieceAndroid: false` and test with `defaultToSpeaker` option if available.
 
 ### Step 5: Crossfader Integration
 
@@ -223,4 +255,5 @@ Use `expo-av`'s built-in lock screen integration (limited) or `react-native-trac
 - [ ] Local meditation plays simultaneously via expo-av
 - [ ] Fader controls volumes of both sources independently
 - [ ] Locking phone does not stop either audio source
+- [ ] Lock screen shows meditation controls (play/pause at minimum)
 - [ ] All 10 tests from POC_SPEC.md executed and documented

@@ -64,7 +64,7 @@ The webapp already serves tokens at `GET /api/livekit/token`. For the PoC, we ne
 
 **Option A (recommended for PoC):** Standalone token script
 ```bash
-# Generate a 24h listener token using livekit-cli or a small Node script
+# Generate a 7-day listener token using livekit-cli or a small Node script
 # The token grants: room "beacon", canSubscribe=true, canPublish=false
 ```
 
@@ -74,7 +74,7 @@ The webapp already serves tokens at `GET /api/livekit/token`. For the PoC, we ne
 - Room: `beacon`
 - Identity: `mobile-poc-{platform}-{random}`
 - Permissions: `canSubscribe: true, canPublish: false`
-- TTL: 24 hours (for testing convenience)
+- TTL: 7 days (for testing convenience across the full PoC week)
 
 ### Environment Variables (both PoCs)
 ```
@@ -179,6 +179,90 @@ After running all tests, score each PoC:
 | Setup complexity | 15% | 0=>1 week, 1=days of debugging, 2=some issues, 3=straightforward |
 
 **Minimum pass: 2.0 weighted average. Target: 2.5+**
+
+---
+
+## Decision Framework (Post-PoC)
+
+After scoring both PoCs, use these guidelines:
+
+| Scenario | Decision |
+|---|---|
+| RN >= 2.5 AND Flutter < 2.5 | Stay with React Native |
+| Flutter >= 2.5 AND RN < 2.0 | Switch to Flutter (rewrite justified) |
+| Both >= 2.5, delta < 0.5 | Stay with React Native (switching cost too high — existing codebase, team familiarity) |
+| Both >= 2.5, Flutter leads by >= 0.5 | Evaluate switching cost: Flutter must score 3.0 in "crossfader smoothness" to justify a full rewrite |
+| Both < 2.0 | Investigate alternative architectures (native audio bridge, custom mixing engine) before proceeding |
+
+**Switching cost factors** (React Native to Flutter):
+- Full UI rewrite (~14 files, 2-3 weeks)
+- Team ramp-up on Dart/Flutter patterns
+- Loss of existing expo-av integration knowledge
+- New CI/CD pipeline (EAS Build doesn't cover Flutter)
+- iOS testing requires macOS for Flutter (Expo can use EAS cloud builds)
+
+---
+
+## Reconnection Strategy
+
+Both PoCs must handle network transitions gracefully:
+
+**Required implementation:**
+1. Handle reconnection events:
+   - RN: `room.on(RoomEvent.Reconnecting, ...)` and `room.on(RoomEvent.Reconnected, ...)`
+   - Flutter: `_room!.on<RoomReconnectingEvent>(...)` and `_room!.on<RoomReconnectedEvent>(...)`
+2. Show UI indicator when beacon is reconnecting (e.g., pulsing amber dot instead of green)
+3. Meditation must continue uninterrupted during beacon reconnection
+4. Configure reconnect timeout (LiveKit default is fine for PoC, but document the setting)
+
+---
+
+## Local Development Server (Fallback)
+
+If `wss://live.altermundi.net` is unavailable during the PoC week, use a local LiveKit dev server:
+
+```bash
+docker run --rm -p 7880:7880 -p 7881:7881 -p 7882:7882/udp \
+  livekit/livekit-server --dev
+```
+
+Then update token generation and connection URL:
+```bash
+LIVEKIT_URL=ws://localhost:7880
+# --dev mode auto-generates API key/secret: devkey / secret
+LIVEKIT_API_KEY=devkey
+LIVEKIT_API_SECRET=secret
+```
+
+**Note:** `--dev` mode uses `ws://` (not `wss://`). The token script works with any key/secret pair.
+
+---
+
+## Audio Focus Edge Cases
+
+In addition to the 10 core tests, note behavior for these edge cases (document in RESULTS.md but not required for pass):
+
+- **Bluetooth headphones connect/disconnect** mid-playback — does audio route correctly?
+- **Another music app starts playing** (Spotify, YouTube) — does our audio duck or stop?
+- **Voice assistant activation** (Siri/Google Assistant) — do both sources resume after?
+- **Notification with sound** plays while both sources active — any glitches?
+
+---
+
+## Build Configuration Note
+
+After adding `UIBackgroundModes` (iOS) or `foregroundService` (Android) to `app.json`, a rebuild is required:
+
+```bash
+# React Native: regenerate native projects
+npx expo prebuild --clean
+npx expo run:android  # or run:ios
+
+# Flutter: standard rebuild
+flutter clean && flutter run
+```
+
+**Expo Go will NOT work** after adding native modules (LiveKit, background audio). Development builds are required.
 
 ---
 
