@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { Colors } from '../constants/Colors';
 
@@ -8,9 +8,10 @@ interface AudioVisualizerProps {
 }
 
 export function AudioVisualizer({ isPlaying = true, barCount = 5 }: AudioVisualizerProps) {
-    const animations = React.useRef(
+    const animations = useRef(
         [...Array(barCount)].map(() => new Animated.Value(10))
     ).current;
+    const compositeRef = useRef<Animated.CompositeAnimation | null>(null);
 
     useEffect(() => {
         if (isPlaying) {
@@ -36,11 +37,20 @@ export function AudioVisualizer({ isPlaying = true, barCount = 5 }: AudioVisuali
                 createAnimation(anim, i * 100)
             );
 
-            Animated.parallel(runningAnimations).start();
+            const composite = Animated.parallel(runningAnimations);
+            compositeRef.current = composite;
+            composite.start();
         } else {
+            compositeRef.current?.stop();
+            compositeRef.current = null;
             animations.forEach(anim => anim.setValue(10));
         }
-    }, [isPlaying]);
+
+        return () => {
+            compositeRef.current?.stop();
+            compositeRef.current = null;
+        };
+    }, [isPlaying, animations]);
 
     return (
         <View style={styles.container}>

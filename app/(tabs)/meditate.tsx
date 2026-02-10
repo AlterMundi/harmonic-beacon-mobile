@@ -6,7 +6,7 @@ import { Play, Pause, X } from 'lucide-react-native';
 import { useAudio } from '../../context/AudioContext';
 import Slider from '@react-native-community/slider';
 import { BlurView } from 'expo-blur';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 // Require assets to get resource IDs for Expo AV
 const AudioAssets = {
@@ -42,6 +42,7 @@ export default function MeditateScreen() {
 
     const [activeMeditation, setActiveMeditation] = useState<any>(null);
     const [mixValue, setMixValue] = useState(0.5); // 0 = beacon only, 0.5 = equal, 1 = meditation only
+    const isSeekingRef = useRef(false);
 
     // Handle mix slider changes - converts single slider to two volumes
     const handleMixChange = (value: number) => {
@@ -111,8 +112,8 @@ export default function MeditateScreen() {
 
                     {/* Cards */}
                     <View style={[styles.cardList, activeMeditation ? { paddingBottom: 220 } : {}]}>
-                        {meditations.map((item, i) => (
-                            <TouchableOpacity key={i} style={styles.card} onPress={() => startMeditation(item)}>
+                        {meditations.map((item) => (
+                            <TouchableOpacity key={item.id} style={styles.card} onPress={() => startMeditation(item)}>
                                 <LinearGradient
                                     colors={item.color as any}
                                     style={styles.cardImage}
@@ -156,18 +157,22 @@ export default function MeditateScreen() {
                                 style={{ width: '100%', height: 40 }}
                                 minimumValue={0}
                                 maximumValue={meditationDuration || 1}
-                                value={meditationPosition}
-                                onSlidingComplete={seekMeditation}
+                                value={isSeekingRef.current ? undefined : meditationPosition}
+                                onSlidingStart={() => { isSeekingRef.current = true; }}
+                                onSlidingComplete={(v) => {
+                                    isSeekingRef.current = false;
+                                    seekMeditation(v);
+                                }}
                                 minimumTrackTintColor="white"
                                 maximumTrackTintColor="rgba(255,255,255,0.3)"
                                 thumbTintColor="white"
                             />
                             <View style={styles.timeRow}>
                                 <Text style={styles.timeText}>
-                                    {new Date(meditationPosition).toISOString().substr(14, 5)}
+                                    {new Date(meditationPosition).toISOString().substring(14, 19)}
                                 </Text>
                                 <Text style={styles.timeText}>
-                                    {meditationDuration ? new Date(meditationDuration).toISOString().substr(14, 5) : "00:00"}
+                                    {meditationDuration ? new Date(meditationDuration).toISOString().substring(14, 19) : "00:00"}
                                 </Text>
                             </View>
                         </View>

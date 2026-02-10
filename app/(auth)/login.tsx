@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { Mail, Lock, ArrowRight } from 'lucide-react-native';
 import { useState } from 'react';
-import * as AppleAuthentication from 'expo-apple-authentication';
 
 export default function LoginScreen() {
     const { signIn, signInWithGoogle, signInWithApple } = useAuth();

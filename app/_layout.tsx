@@ -1,9 +1,13 @@
+import { registerGlobals } from '@livekit/react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { AuthProvider } from '../context/AuthContext';
 import { AudioProvider } from '../context/AudioContext';
+
+// Register LiveKit/WebRTC polyfills as early as possible
+registerGlobals();
 
 export default function RootLayout() {
     return (

@@ -14,6 +14,7 @@ export default function LiveScreen() {
         isBuffering,
         beaconConnected,
         beaconReconnecting,
+        beaconError,
         togglePlay,
         connectBeacon,
         disconnectBeacon,
@@ -58,6 +59,7 @@ export default function LiveScreen() {
 
     // Determine status text
     const getStatusText = () => {
+        if (beaconError) return beaconError;
         if (isBuffering) return 'Connecting to Beacon...';
         if (beaconReconnecting) return 'Reconnecting...';
         if (beaconConnected && isPlaying) return 'Live Resonance Active';

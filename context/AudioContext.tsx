@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
-import { registerGlobals } from '@livekit/react-native';
 import {
     Room,
     RoomEvent,
@@ -11,9 +10,6 @@ import {
     RemoteTrackPublication,
     ConnectionState,
 } from 'livekit-client';
-
-// Register LiveKit globals (WebRTC polyfills for React Native)
-registerGlobals();
 
 // --- Configuration ---
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'wss://live.altermundi.net';
@@ -26,6 +22,7 @@ type AudioContextType = {
     isBuffering: boolean;
     beaconConnected: boolean;
     beaconReconnecting: boolean;
+    beaconError: string | null;
     volume: number;
     togglePlay: () => Promise<void>;
     setVolume: (v: number) => Promise<void>;
@@ -49,6 +46,7 @@ const AudioContext = createContext<AudioContextType>({
     isBuffering: false,
     beaconConnected: false,
     beaconReconnecting: false,
+    beaconError: null,
     volume: 0.5,
     togglePlay: async () => { },
     setVolume: async () => { },
@@ -78,6 +76,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     const [isBuffering, setIsBuffering] = useState(false);
     const [beaconConnected, setBeaconConnected] = useState(false);
     const [beaconReconnecting, setBeaconReconnecting] = useState(false);
+    const [beaconError, setBeaconError] = useState<string | null>(null);
     const [volume, setVolumeState] = useState(0.5);
 
     // Refs to avoid stale closures in event handlers
@@ -108,7 +107,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                 playsInSilentModeIOS: true,
                 staysActiveInBackground: true,
                 interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
-                interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+                interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
                 shouldDuckAndroid: false, // We control volumes ourselves via crossfader
                 playThroughEarpieceAndroid: false,
             });
@@ -178,10 +177,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (!LIVEKIT_TOKEN) {
-            console.error('[AudioContext] No LIVEKIT_TOKEN configured. Set EXPO_PUBLIC_LIVEKIT_TOKEN in .env');
+            setBeaconError('No LiveKit token configured. Set EXPO_PUBLIC_LIVEKIT_TOKEN in .env');
             return;
         }
 
+        setBeaconError(null);
         setIsBuffering(true);
 
         try {
@@ -266,9 +266,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                 },
             );
 
-            // Connect to the room
-            await room.connect(LIVEKIT_URL, LIVEKIT_TOKEN);
+            // Set ref before connecting so event handlers can access it
             roomRef.current = room;
+            await room.connect(LIVEKIT_URL, LIVEKIT_TOKEN);
 
             // Check if the beacon publisher is already in the room and has tracks
             room.remoteParticipants.forEach((participant) => {
@@ -285,8 +285,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
             });
         } catch (error) {
             console.error('[AudioContext] Failed to connect to beacon room:', error);
+            setBeaconError(`Connection failed: ${error}`);
             setIsBuffering(false);
             setBeaconConnected(false);
+            roomRef.current = null;
         }
     }, [configureAudioSession, applyBeaconVolume]); // volume removed — uses volumeRef
 
@@ -396,13 +398,32 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    // Throttle meditation volume native calls to prevent bridge flooding during crossfader drag
+    const meditationVolumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingMeditationVolRef = useRef<number | null>(null);
+
     const setMeditationVolume = useCallback(async (v: number) => {
         setMeditationVolumeState(v);
         // meditationVolumeRef updated via useEffect
-        const sound = meditationSoundRef.current;
-        if (sound) {
-            await sound.setVolumeAsync(v);
-        }
+
+        // Throttle native calls to ~30fps
+        pendingMeditationVolRef.current = v;
+        if (meditationVolumeTimerRef.current) return;
+
+        meditationVolumeTimerRef.current = setTimeout(async () => {
+            meditationVolumeTimerRef.current = null;
+            const vol = pendingMeditationVolRef.current;
+            if (vol !== null) {
+                const sound = meditationSoundRef.current;
+                if (sound) {
+                    try {
+                        await sound.setVolumeAsync(vol);
+                    } catch (e) {
+                        console.warn('[AudioContext] setVolumeAsync failed:', e);
+                    }
+                }
+            }
+        }, 32);
     }, []);
 
     return (
@@ -412,6 +433,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                 isBuffering,
                 beaconConnected,
                 beaconReconnecting,
+                beaconError,
                 volume,
                 togglePlay,
                 setVolume,
