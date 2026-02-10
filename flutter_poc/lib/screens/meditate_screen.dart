@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
@@ -29,21 +30,21 @@ const _meditations = [
     title: 'La Mosca',
     subtitle: 'Guided meditation',
     assetPath: 'assets/audio/la_mosca.m4a',
-    duration: '12 min',
+    duration: '0:52',
     gradientColors: [Color(0xFF6346FF), Color(0xFF3A1FCC)],
   ),
   _MeditationInfo(
     title: 'Humanosfera',
     subtitle: 'Sound journey',
     assetPath: 'assets/audio/humanosfera.m4a',
-    duration: '15 min',
+    duration: '2:03',
     gradientColors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
   ),
   _MeditationInfo(
     title: 'El Amor',
     subtitle: 'Heart meditation',
     assetPath: 'assets/audio/amor.m4a',
-    duration: '10 min',
+    duration: '4:35',
     gradientColors: [Color(0xFFE91E63), Color(0xFF880E4F)],
   ),
 ];
@@ -100,7 +101,9 @@ class MeditateScreen extends StatelessWidget {
           // Bottom sheet player
           Consumer<MeditationPlayer>(
             builder: (context, player, child) {
-              if (player.currentAsset == null) return const SizedBox.shrink();
+              if (player.currentAsset == null) {
+                return _EmptyPlayerHint();
+              }
               return _PlayerBottomSheet(player: player);
             },
           ),
@@ -119,6 +122,26 @@ class MeditateScreen extends StatelessWidget {
     }
 
     await player.load(med.assetPath, title: med.title);
+  }
+}
+
+class _EmptyPlayerHint extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.headphones_rounded, color: Colors.white24, size: 20),
+          SizedBox(width: 8),
+          Text(
+            'Tap a meditation above to start listening',
+            style: TextStyle(color: Colors.white24, fontSize: 13),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -234,6 +257,24 @@ class _PlayerBottomSheet extends StatelessWidget {
                         size: 28,
                       );
                     },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Stop/close button
+              GestureDetector(
+                onTap: () => player.stop(),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.08),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white54,
+                    size: 20,
                   ),
                 ),
               ),

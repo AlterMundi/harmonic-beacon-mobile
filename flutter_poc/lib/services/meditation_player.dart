@@ -43,6 +43,7 @@ class MeditationPlayer extends ChangeNotifier {
   void setVolume(double vol) {
     _volume = vol.clamp(0.0, 1.0);
     _player.setVolume(_volume);
+    notifyListeners();
   }
 
   Future<void> stop() async {

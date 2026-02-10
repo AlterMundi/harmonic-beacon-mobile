@@ -12,6 +12,25 @@ class LiveScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<BeaconService>(
       builder: (context, beacon, child) {
+        // Show error snackbar if there's an error
+        if (beacon.errorMessage != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(beacon.errorMessage!),
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'Dismiss',
+                    onPressed: () => beacon.clearError(),
+                  ),
+                ),
+              );
+              beacon.clearError();
+            }
+          });
+        }
+
         return Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -72,6 +91,7 @@ class LiveScreen extends StatelessWidget {
                                 'No LiveKit token configured. '
                                 'Pass --dart-define=LIVEKIT_TOKEN=<token> when building.',
                               ),
+                              duration: Duration(seconds: 5),
                             ),
                           );
                         }
@@ -86,18 +106,29 @@ class LiveScreen extends StatelessWidget {
                 if (beacon.isConnected)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 48),
-                    child: Row(
+                    child: Column(
                       children: [
-                        const Icon(Icons.volume_down,
-                            color: Colors.white38, size: 20),
-                        Expanded(
-                          child: Slider(
-                            value: beacon.volume,
-                            onChanged: (v) => beacon.setVolume(v),
+                        Row(
+                          children: [
+                            const Icon(Icons.volume_down,
+                                color: Colors.white38, size: 20),
+                            Expanded(
+                              child: Slider(
+                                value: beacon.volume,
+                                onChanged: (v) => beacon.setVolume(v),
+                              ),
+                            ),
+                            const Icon(Icons.volume_up,
+                                color: Colors.white38, size: 20),
+                          ],
+                        ),
+                        Text(
+                          '${(beacon.volume * 100).round()}%',
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
                           ),
                         ),
-                        const Icon(Icons.volume_up,
-                            color: Colors.white38, size: 20),
                       ],
                     ),
                   ),

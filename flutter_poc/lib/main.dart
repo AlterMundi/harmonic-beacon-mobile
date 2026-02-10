@@ -16,7 +16,7 @@ const livekitToken = String.fromEnvironment(
   defaultValue: '',
 );
 
-Future<void> _configureAudioSession() async {
+Future<void> configureAudioSession() async {
   final session = await AudioSession.instance;
   await session.configure(const AudioSessionConfiguration(
     avAudioSessionCategory: AVAudioSessionCategory.playback,
@@ -36,7 +36,7 @@ Future<void> _configureAudioSession() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _configureAudioSession();
+  await configureAudioSession();
   runApp(const HarmonicBeaconApp());
 }
 
@@ -45,18 +45,15 @@ class HarmonicBeaconApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final beaconService = BeaconService();
-    final meditationPlayer = MeditationPlayer();
-    final mixEngine = MixEngine(
-      beacon: beaconService,
-      meditation: meditationPlayer,
-    );
-
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: beaconService),
-        ChangeNotifierProvider.value(value: meditationPlayer),
-        ChangeNotifierProvider.value(value: mixEngine),
+        ChangeNotifierProvider(create: (_) => BeaconService()),
+        ChangeNotifierProvider(create: (_) => MeditationPlayer()),
+        ProxyProvider2<BeaconService, MeditationPlayer, MixEngine>(
+          update: (_, beacon, meditation, previous) =>
+              previous ?? MixEngine(beacon: beacon, meditation: meditation),
+          dispose: (_, engine) => engine.dispose(),
+        ),
       ],
       child: MaterialApp(
         title: 'Harmonic Beacon',
