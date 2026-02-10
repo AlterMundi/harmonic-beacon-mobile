@@ -16,7 +16,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.altermundi.harmonicbeacon",
-      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Camera access may be requested by the WebRTC framework but is not used by this app.",
         "NSMicrophoneUsageDescription": "Required for WebRTC audio sessions with the live beacon.",
@@ -41,7 +40,12 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "@livekit/react-native-webrtc"
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Required for WebRTC audio sessions with the live beacon."
+        }
+      ]
     ],
     "extra": {
       "eas": {
