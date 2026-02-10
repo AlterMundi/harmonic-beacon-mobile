@@ -31,7 +31,7 @@ class MeditationCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: gradientColors.first.withOpacity(0.3),
+              color: gradientColors.first.withValues(alpha:0.3),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -48,7 +48,7 @@ class MeditationCard extends StatelessWidget {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha:0.1),
                 ),
               ),
             ),
@@ -60,7 +60,7 @@ class MeditationCard extends StatelessWidget {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha:0.05),
                 ),
               ),
             ),
@@ -86,7 +86,7 @@ class MeditationCard extends StatelessWidget {
                         Text(
                           subtitle,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha:0.7),
                             fontSize: 14,
                           ),
                         ),
@@ -97,7 +97,7 @@ class MeditationCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha:0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -118,7 +118,7 @@ class MeditationCard extends StatelessWidget {
                     height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha:0.2),
                     ),
                     child: const Icon(
                       Icons.play_arrow_rounded,

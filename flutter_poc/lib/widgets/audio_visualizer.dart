@@ -83,7 +83,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
                 height: height.clamp(4.0, maxHeight),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(barWidth / 2),
-                  color: widget.color.withOpacity(opacity),
+                  color: widget.color.withValues(alpha:opacity),
                 ),
               ),
             );

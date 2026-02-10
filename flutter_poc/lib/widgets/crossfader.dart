@@ -19,7 +19,7 @@ class Crossfader extends StatelessWidget {
           data: SliderTheme.of(context).copyWith(
             trackHeight: 4,
             activeTrackColor: const Color(0xFF6346FF),
-            inactiveTrackColor: const Color(0xFFFBBF24).withOpacity(0.3),
+            inactiveTrackColor: const Color(0xFFFBBF24).withValues(alpha:0.3),
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
           ),

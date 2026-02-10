@@ -102,7 +102,7 @@ class MeditateScreen extends StatelessWidget {
           Consumer<MeditationPlayer>(
             builder: (context, player, child) {
               if (player.currentAsset == null) {
-                return _EmptyPlayerHint();
+                return const _EmptyPlayerHint();
               }
               return _PlayerBottomSheet(player: player);
             },
@@ -121,11 +121,21 @@ class MeditateScreen extends StatelessWidget {
       beacon.connect(livekitUrl, livekitToken);
     }
 
-    await player.load(med.assetPath, title: med.title);
+    try {
+      await player.load(med.assetPath, title: med.title);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load ${med.title}: $e')),
+        );
+      }
+    }
   }
 }
 
 class _EmptyPlayerHint extends StatelessWidget {
+  const _EmptyPlayerHint();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -167,7 +177,7 @@ class _PlayerBottomSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha:0.3),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -222,7 +232,7 @@ class _PlayerBottomSheet extends StatelessWidget {
                         Text(
                           beacon.isConnected
                               ? (beacon.hasTrack
-                                  ? 'Beacon connected'
+                                  ? 'Beacon ${beacon.isLiveSource ? "live" : "playlist"}'
                                   : 'Waiting for beacon...')
                               : 'Beacon offline',
                           style: const TextStyle(
@@ -269,7 +279,7 @@ class _PlayerBottomSheet extends StatelessWidget {
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha:0.08),
                   ),
                   child: const Icon(
                     Icons.close_rounded,

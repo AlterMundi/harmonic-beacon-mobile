@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,14 +9,22 @@ import 'services/beacon_service.dart';
 import 'services/meditation_player.dart';
 import 'services/mix_engine.dart';
 
+// Bypass SSL certificate errors — debug builds only
+class _DebugHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 const livekitUrl = String.fromEnvironment(
   'LIVEKIT_URL',
   defaultValue: 'wss://live.altermundi.net',
 );
-const livekitToken = String.fromEnvironment(
-  'LIVEKIT_TOKEN',
-  defaultValue: '',
-);
+// Pass --dart-define=LIVEKIT_TOKEN=<token> when building.
+// Generate with: node scripts/generate-livekit-token.js
+const livekitToken = String.fromEnvironment('LIVEKIT_TOKEN');
 
 Future<void> configureAudioSession() async {
   final session = await AudioSession.instance;
@@ -36,6 +46,9 @@ Future<void> configureAudioSession() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kDebugMode) {
+    HttpOverrides.global = _DebugHttpOverrides();
+  }
   await configureAudioSession();
   runApp(const HarmonicBeaconApp());
 }
@@ -49,10 +62,11 @@ class HarmonicBeaconApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => BeaconService()),
         ChangeNotifierProvider(create: (_) => MeditationPlayer()),
-        ProxyProvider2<BeaconService, MeditationPlayer, MixEngine>(
-          update: (_, beacon, meditation, previous) =>
-              previous ?? MixEngine(beacon: beacon, meditation: meditation),
-          dispose: (_, engine) => engine.dispose(),
+        ChangeNotifierProvider<MixEngine>(
+          create: (context) => MixEngine(
+            beacon: Provider.of<BeaconService>(context, listen: false),
+            meditation: Provider.of<MeditationPlayer>(context, listen: false),
+          ),
         ),
       ],
       child: MaterialApp(
@@ -81,8 +95,8 @@ class HarmonicBeaconApp extends StatelessWidget {
             thumbColor: Color(0xFF6346FF),
             overlayColor: Color(0x336346FF),
           ),
-          cardTheme: CardTheme(
-            color: Colors.white.withOpacity(0.05),
+          cardTheme: CardThemeData(
+            color: Colors.white.withValues(alpha: 0.05),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),

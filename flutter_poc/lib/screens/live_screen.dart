@@ -12,21 +12,19 @@ class LiveScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<BeaconService>(
       builder: (context, beacon, child) {
-        // Show error snackbar if there's an error
+        // Show error snackbar if there's an error.
+        // Copy the message and clear immediately to prevent rebuild loops.
         if (beacon.errorMessage != null) {
+          final msg = beacon.errorMessage!;
+          beacon.clearError();
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(beacon.errorMessage!),
+                  content: Text(msg),
                   duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'Dismiss',
-                    onPressed: () => beacon.clearError(),
-                  ),
                 ),
               );
-              beacon.clearError();
             }
           });
         }
@@ -45,12 +43,15 @@ class LiveScreen extends StatelessWidget {
           child: SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Spacer(flex: 2),
                 // LIVE badge
-                _LiveBadge(
-                  isConnected: beacon.isConnected,
-                  isReconnecting: beacon.isReconnecting,
+                Center(
+                  child: _LiveBadge(
+                    isConnected: beacon.isConnected,
+                    isReconnecting: beacon.isReconnecting,
+                  ),
                 ),
                 const SizedBox(height: 32),
                 // Status text
@@ -59,9 +60,10 @@ class LiveScreen extends StatelessWidget {
                       ? (beacon.isReconnecting
                           ? 'Reconnecting...'
                           : (beacon.hasTrack
-                              ? 'Receiving beacon signal'
+                              ? 'Receiving ${beacon.isLiveSource ? "live" : "playlist"} signal'
                               : 'Connected - waiting for beacon...'))
                       : 'Tap to connect',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: beacon.isConnected ? Colors.white70 : Colors.white38,
                     fontSize: 16,
@@ -77,29 +79,31 @@ class LiveScreen extends StatelessWidget {
                 if (beacon.isConnected && beacon.hasTrack)
                   const SizedBox(height: 48),
                 // Play/Pause button
-                _PlayButton(
-                  isConnected: beacon.isConnected,
-                  onPressed: () async {
-                    if (beacon.isConnected) {
-                      await beacon.disconnect();
-                    } else {
-                      if (livekitToken.isEmpty) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'No LiveKit token configured. '
-                                'Pass --dart-define=LIVEKIT_TOKEN=<token> when building.',
+                Center(
+                  child: _PlayButton(
+                    isConnected: beacon.isConnected,
+                    onPressed: () async {
+                      if (beacon.isConnected) {
+                        await beacon.disconnect();
+                      } else {
+                        if (livekitToken.isEmpty) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'No LiveKit token configured. '
+                                  'Pass --dart-define=LIVEKIT_TOKEN=<token> when building.',
+                                ),
+                                duration: Duration(seconds: 5),
                               ),
-                              duration: Duration(seconds: 5),
-                            ),
-                          );
+                            );
+                          }
+                          return;
                         }
-                        return;
+                        await beacon.connect(livekitUrl, livekitToken);
                       }
-                      await beacon.connect(livekitUrl, livekitToken);
-                    }
-                  },
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
                 // Volume slider
@@ -196,7 +200,7 @@ class _LiveBadgeState extends State<_LiveBadge>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: widget.isConnected
-                    ? dotColor.withOpacity(_pulseAnimation.value)
+                    ? dotColor.withValues(alpha:_pulseAnimation.value)
                     : dotColor,
               ),
             );
@@ -240,11 +244,11 @@ class _PlayButton extends StatelessWidget {
                   colors: [Color(0xFF6346FF), Color(0xFF8B6DFF)],
                 )
               : null,
-          color: isConnected ? null : Colors.white.withOpacity(0.1),
+          color: isConnected ? null : Colors.white.withValues(alpha:0.1),
           boxShadow: isConnected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF6346FF).withOpacity(0.4),
+                    color: const Color(0xFF6346FF).withValues(alpha:0.4),
                     blurRadius: 24,
                     spreadRadius: 4,
                   ),
@@ -260,3 +264,4 @@ class _PlayButton extends StatelessWidget {
     );
   }
 }
+

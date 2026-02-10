@@ -21,10 +21,21 @@ class MeditationPlayer extends ChangeNotifier {
   Future<void> load(String assetPath, {String? title}) async {
     _currentAsset = assetPath;
     _currentTitle = title;
-    await _player.setAsset(assetPath);
-    await _player.setVolume(_volume);
-    await _player.play();
+    // Notify immediately so UI shows player (even if loading)
     notifyListeners();
+
+    try {
+      await _player.setAsset(assetPath);
+      await _player.setVolume(_volume);
+      await _player.play();
+      notifyListeners();
+    } catch (e) {
+      // Reset state on failure so UI doesn't show a broken player bar
+      _currentAsset = null;
+      _currentTitle = null;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> togglePlay() async {
@@ -43,7 +54,8 @@ class MeditationPlayer extends ChangeNotifier {
   void setVolume(double vol) {
     _volume = vol.clamp(0.0, 1.0);
     _player.setVolume(_volume);
-    notifyListeners();
+    // Don't call notifyListeners here — called per-frame during crossfader drag.
+    // MixEngine already notifies its own listeners.
   }
 
   Future<void> stop() async {

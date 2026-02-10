@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   livekit_client: ^2.3.0
+  flutter_webrtc: ^1.3.0
   just_audio: ^0.9.40
   audio_session: ^0.1.21
   provider: ^6.1.2
