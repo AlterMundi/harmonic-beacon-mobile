@@ -31,7 +31,7 @@ type AudioContextType = {
     setVolume: (v: number) => Promise<void>;
     connectBeacon: () => Promise<void>;
     disconnectBeacon: () => Promise<void>;
-    // Meditation (expo-av -- unchanged)
+    // Meditation (expo-av)
     loadMeditation: (source: any) => Promise<void>;
     unloadMeditation: () => Promise<void>;
     meditationSound: Audio.Sound | null;
@@ -80,12 +80,26 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     const [beaconReconnecting, setBeaconReconnecting] = useState(false);
     const [volume, setVolumeState] = useState(0.5);
 
-    // --- Meditation State (unchanged from original) ---
+    // Refs to avoid stale closures in event handlers
+    const volumeRef = useRef(volume);
+    useEffect(() => { volumeRef.current = volume; }, [volume]);
+
+    const isPlayingRef = useRef(isPlaying);
+    useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+    // --- Meditation State ---
     const [meditationSound, setMeditationSound] = useState<Audio.Sound | null>(null);
     const [meditationIsPlaying, setMeditationIsPlaying] = useState(false);
     const [meditationDuration, setMeditationDuration] = useState(0);
     const [meditationPosition, setMeditationPosition] = useState(0);
     const [meditationVolume, setMeditationVolumeState] = useState(1.0);
+
+    // Refs to avoid stale closures in meditation callbacks
+    const meditationSoundRef = useRef<Audio.Sound | null>(null);
+    useEffect(() => { meditationSoundRef.current = meditationSound; }, [meditationSound]);
+
+    const meditationVolumeRef = useRef(meditationVolume);
+    useEffect(() => { meditationVolumeRef.current = meditationVolume; }, [meditationVolume]);
 
     // --- Audio Session Setup ---
     const configureAudioSession = useCallback(async () => {
@@ -112,6 +126,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                 roomRef.current.disconnect();
                 roomRef.current = null;
             }
+            if (meditationSoundRef.current) {
+                meditationSoundRef.current.unloadAsync();
+            }
         };
     }, [configureAudioSession]);
 
@@ -136,11 +153,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            // Attempt 2: Access the underlying MediaStreamTrack and try to adjust
-            // via the Web Audio API or RTCRtpReceiver. This is platform-dependent.
+            // Attempt 2: Access the underlying MediaStreamTrack for mute/unmute
             const mediaStreamTrack = track.mediaStreamTrack;
             if (mediaStreamTrack) {
-                // On React Native, we can at least mute/unmute
                 if (vol === 0) {
                     mediaStreamTrack.enabled = false;
                     console.log('[AudioContext] Beacon muted via mediaStreamTrack.enabled = false');
@@ -155,6 +170,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     // --- LiveKit Room Connection ---
+    // Uses refs for volume to avoid stale closures and unnecessary recreations
     const connectBeacon = useCallback(async () => {
         if (roomRef.current?.state === ConnectionState.Connected) {
             console.log('[AudioContext] Already connected to beacon room');
@@ -224,8 +240,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                         const audioTrack = track as RemoteAudioTrack;
                         beaconTrackRef.current = audioTrack;
 
-                        // Apply current volume setting to the newly subscribed track
-                        applyBeaconVolume(volume);
+                        // Use ref to get current volume (avoids stale closure)
+                        applyBeaconVolume(volumeRef.current);
 
                         console.log('[AudioContext] Beacon audio track attached');
                     }
@@ -260,7 +276,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                     if (pub.track && pub.track.kind === Track.Kind.Audio) {
                         const audioTrack = pub.track as RemoteAudioTrack;
                         beaconTrackRef.current = audioTrack;
-                        applyBeaconVolume(volume);
+                        applyBeaconVolume(volumeRef.current);
                         console.log(
                             `[AudioContext] Found existing beacon track from ${participant.identity}`
                         );
@@ -272,7 +288,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
             setIsBuffering(false);
             setBeaconConnected(false);
         }
-    }, [volume, configureAudioSession, applyBeaconVolume]);
+    }, [configureAudioSession, applyBeaconVolume]); // volume removed — uses volumeRef
 
     const disconnectBeacon = useCallback(async () => {
         if (roomRef.current) {
@@ -287,44 +303,46 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     // --- Beacon Playback Toggle ---
-    // When connected, toggle mutes/unmutes the beacon track.
-    // When disconnected, this is a no-op (use connectBeacon instead).
     const togglePlay = useCallback(async () => {
         if (!roomRef.current || roomRef.current.state !== ConnectionState.Connected) {
             return;
         }
 
-        if (isPlaying) {
-            // Mute beacon
+        if (isPlayingRef.current) {
             applyBeaconVolume(0);
             setIsPlaying(false);
         } else {
-            // Unmute beacon at current volume
-            applyBeaconVolume(volume);
+            applyBeaconVolume(volumeRef.current);
             setIsPlaying(true);
         }
-    }, [isPlaying, volume, applyBeaconVolume]);
+    }, [applyBeaconVolume]);
 
     // --- Beacon Volume ---
     const setVolume = useCallback(async (v: number) => {
         setVolumeState(v);
-        if (isPlaying) {
+        // volumeRef updated via useEffect
+        if (isPlayingRef.current) {
             applyBeaconVolume(v);
         }
-    }, [isPlaying, applyBeaconVolume]);
+    }, [applyBeaconVolume]);
 
-    // --- Meditation Logic (unchanged from original) ---
+    // --- Meditation Logic ---
 
     const loadMeditation = useCallback(async (source: any) => {
-        // Unload existing if any
-        if (meditationSound) {
-            await meditationSound.unloadAsync();
+        // Unload existing if any (use ref to get current sound)
+        const existingSound = meditationSoundRef.current;
+        if (existingSound) {
+            try {
+                await existingSound.unloadAsync();
+            } catch (e) {
+                console.warn('[AudioContext] Error unloading previous meditation:', e);
+            }
         }
 
         try {
             const { sound: newMeditation } = await Audio.Sound.createAsync(
                 source,
-                { shouldPlay: true, volume: meditationVolume },
+                { shouldPlay: true, volume: meditationVolumeRef.current },
                 (status: any) => {
                     if (status.isLoaded) {
                         setMeditationIsPlaying(status.isPlaying);
@@ -338,43 +356,54 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                 }
             );
             setMeditationSound(newMeditation);
+            // meditationSoundRef updated via useEffect
         } catch (error) {
             console.error('[AudioContext] Error loading meditation:', error);
         }
-    }, [meditationSound, meditationVolume]);
+    }, []); // No deps — uses refs for sound and volume
 
     const unloadMeditation = useCallback(async () => {
-        if (meditationSound) {
+        const sound = meditationSoundRef.current;
+        if (sound) {
             setMeditationIsPlaying(false);
             setMeditationPosition(0);
             setMeditationDuration(0);
-            await meditationSound.stopAsync();
-            await meditationSound.unloadAsync();
+            try {
+                await sound.stopAsync();
+                await sound.unloadAsync();
+            } catch (e) {
+                console.warn('[AudioContext] Error unloading meditation:', e);
+            }
             setMeditationSound(null);
         }
-    }, [meditationSound]);
+    }, []);
 
     const toggleMeditation = useCallback(async () => {
-        if (!meditationSound) return;
-        if (meditationIsPlaying) {
-            await meditationSound.pauseAsync();
+        const sound = meditationSoundRef.current;
+        if (!sound) return;
+        const status = await sound.getStatusAsync();
+        if (status.isLoaded && status.isPlaying) {
+            await sound.pauseAsync();
         } else {
-            await meditationSound.playAsync();
+            await sound.playAsync();
         }
-    }, [meditationSound, meditationIsPlaying]);
+    }, []);
 
     const seekMeditation = useCallback(async (millis: number) => {
-        if (meditationSound) {
-            await meditationSound.setPositionAsync(millis);
+        const sound = meditationSoundRef.current;
+        if (sound) {
+            await sound.setPositionAsync(millis);
         }
-    }, [meditationSound]);
+    }, []);
 
     const setMeditationVolume = useCallback(async (v: number) => {
         setMeditationVolumeState(v);
-        if (meditationSound) {
-            await meditationSound.setVolumeAsync(v);
+        // meditationVolumeRef updated via useEffect
+        const sound = meditationSoundRef.current;
+        if (sound) {
+            await sound.setVolumeAsync(v);
         }
-    }, [meditationSound]);
+    }, []);
 
     return (
         <AudioContext.Provider

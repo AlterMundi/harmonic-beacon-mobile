@@ -1,17 +1,12 @@
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioVisualizer } from '../../components/AudioVisualizer';
 import { useAudio } from '../../context/AudioContext';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { Play, Pause } from 'lucide-react-native';
+import { Play, Pause, X } from 'lucide-react-native';
+import Slider from '@react-native-community/slider';
 import { useEffect, useRef } from 'react';
-
-const { width, height } = Dimensions.get('window');
-
-// Local ambient video - place your beacon footage in assets/video/
-const AMBIENT_VIDEO = require('../../assets/video/beacon_ambient.mp4');
 
 export default function LiveScreen() {
     const {
@@ -52,23 +47,13 @@ export default function LiveScreen() {
         }
     }, [beaconReconnecting, pulseAnim]);
 
-    // Create video player with expo-video
-    const player = useVideoPlayer(AMBIENT_VIDEO, player => {
-        player.loop = true;
-        player.muted = true;
-        player.play();
-    });
-
     // Handle the main button press
     const handleMainButton = async () => {
         if (!beaconConnected && !isBuffering) {
-            // Not connected yet -- connect
             await connectBeacon();
         } else if (beaconConnected) {
-            // Connected -- toggle play/pause (mute/unmute)
             await togglePlay();
         }
-        // If buffering, do nothing (already connecting)
     };
 
     // Determine status text
@@ -110,18 +95,10 @@ export default function LiveScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Full-screen background video */}
-            <VideoView
-                player={player}
-                style={styles.backgroundVideo}
-                contentFit="cover"
-                nativeControls={false}
-            />
-
-            {/* Gradient overlay for readability */}
+            {/* Gradient background */}
             <LinearGradient
-                colors={['rgba(10, 10, 26, 0.3)', 'rgba(10, 10, 26, 0.7)', 'rgba(10, 10, 26, 0.95)']}
-                style={styles.gradientOverlay}
+                colors={['#12122a', '#0a0a1a', '#0d0d20']}
+                style={StyleSheet.absoluteFill}
             />
 
             {/* Content */}
@@ -174,6 +151,43 @@ export default function LiveScreen() {
                         </Text>
                     </View>
 
+                    {/* Volume slider when connected */}
+                    {beaconConnected && (
+                        <View style={styles.volumeContainer}>
+                            <Text style={styles.volumeLabel}>Volume</Text>
+                            <View style={styles.volumeRow}>
+                                <Text style={styles.volumeIcon}>-</Text>
+                                <Slider
+                                    style={{ flex: 1, height: 40 }}
+                                    minimumValue={0}
+                                    maximumValue={1}
+                                    value={volume}
+                                    onValueChange={setVolume}
+                                    minimumTrackTintColor={Colors.primary[500]}
+                                    maximumTrackTintColor="rgba(255,255,255,0.15)"
+                                    thumbTintColor="#ffffff"
+                                />
+                                <Text style={styles.volumeIcon}>+</Text>
+                            </View>
+                            <Text style={styles.volumePercent}>
+                                {Math.round(volume * 100)}%
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Disconnect button */}
+                    {beaconConnected && (
+                        <View style={styles.disconnectContainer}>
+                            <TouchableOpacity
+                                onPress={disconnectBeacon}
+                                style={styles.disconnectBtn}
+                            >
+                                <X size={16} color="rgba(255,255,255,0.6)" />
+                                <Text style={styles.disconnectText}>Disconnect</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
                     {/* Status Text */}
                     <View style={styles.statusContainer}>
                         <Text style={styles.statusDetailText}>
@@ -192,20 +206,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#0a0a1a',
-    },
-    backgroundVideo: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: width,
-        height: height,
-    },
-    gradientOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
     },
     safeArea: {
         flex: 1,
@@ -247,12 +247,6 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 10,
     },
-    headerSubtitle: {
-        fontSize: 16,
-        color: Colors.text.secondary,
-        textAlign: 'center',
-        marginTop: 8,
-    },
     visualizerContainer: {
         height: 80,
         justifyContent: 'center',
@@ -261,7 +255,7 @@ const styles = StyleSheet.create({
     },
     playBtnContainer: {
         alignItems: 'center',
-        marginBottom: 32,
+        marginBottom: 24,
     },
     mainPlayBtn: {
         width: 80,
@@ -278,11 +272,50 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: 'rgba(255,255,255,0.2)',
     },
-    statusText: {
-        color: Colors.text.secondary,
-        fontSize: 14,
-        fontWeight: '500',
-        marginTop: 16,
+    volumeContainer: {
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        marginBottom: 16,
+    },
+    volumeLabel: {
+        fontSize: 12,
+        color: Colors.text.muted,
+        marginBottom: 4,
+    },
+    volumeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        gap: 8,
+    },
+    volumeIcon: {
+        fontSize: 16,
+        color: Colors.text.muted,
+        fontWeight: '600',
+    },
+    volumePercent: {
+        fontSize: 12,
+        color: Colors.text.muted,
+        marginTop: 2,
+    },
+    disconnectContainer: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    disconnectBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    disconnectText: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.6)',
     },
     statusContainer: {
         marginTop: 'auto',
