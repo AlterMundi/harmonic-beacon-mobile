@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
+import '../services/auth_service.dart';
 import '../services/beacon_service.dart';
+import '../theme.dart';
 import '../widgets/audio_visualizer.dart';
 
 class LiveScreen extends StatelessWidget {
@@ -16,8 +18,8 @@ class LiveScreen extends StatelessWidget {
         // Copy the message and clear immediately to prevent rebuild loops.
         if (beacon.errorMessage != null) {
           final msg = beacon.errorMessage!;
-          beacon.clearError();
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            beacon.clearError();
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -30,16 +32,7 @@ class LiveScreen extends StatelessWidget {
         }
 
         return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF12122A),
-                Color(0xFF0A0A1A),
-              ],
-            ),
-          ),
+          decoration: const BoxDecoration(gradient: AppGradients.background),
           child: SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -86,21 +79,19 @@ class LiveScreen extends StatelessWidget {
                       if (beacon.isConnected) {
                         await beacon.disconnect();
                       } else {
-                        if (livekitToken.isEmpty) {
+                        final auth = context.read<AuthService>();
+                        if (auth.accessToken == null) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  'No LiveKit token configured. '
-                                  'Pass --dart-define=LIVEKIT_TOKEN=<token> when building.',
-                                ),
-                                duration: Duration(seconds: 5),
+                                content: Text('Please sign in first.'),
+                                duration: Duration(seconds: 3),
                               ),
                             );
                           }
                           return;
                         }
-                        await beacon.connect(livekitUrl, livekitToken);
+                        await beacon.connect(livekitUrl, auth.accessToken!);
                       }
                     },
                   ),

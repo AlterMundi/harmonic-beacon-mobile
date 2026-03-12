@@ -5,8 +5,22 @@ allprojects {
     }
 }
 
-rootProject.buildDir = "../build"
+// Provide a stub 'flutter' ext object so that plugins that reference
+// flutter.compileSdkVersion / flutter.targetSdkVersion / flutter.minSdkVersion
+// can evaluate correctly on Flutter 3.24.5.
+// The actual app module uses the real FlutterExtension applied by flutter-gradle-plugin.
+subprojects {
+    if (it.name != "app") {
+        ext.flutter = [
+            compileSdkVersion: 35,
+            targetSdkVersion : 35,
+            minSdkVersion    : 24,
+            ndkVersion       : "27.0.12077973",
+        ]
+    }
+}
 
+rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }

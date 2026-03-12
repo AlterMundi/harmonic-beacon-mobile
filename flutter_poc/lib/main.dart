@@ -1,31 +1,29 @@
-import 'dart:io';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
 import 'services/beacon_service.dart';
 import 'services/meditation_player.dart';
 import 'services/mix_engine.dart';
+import 'theme.dart';
 
-// Bypass SSL certificate errors — debug builds only
-class _DebugHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-  }
-}
-
+// --- Configuration ---
 const livekitUrl = String.fromEnvironment(
   'LIVEKIT_URL',
   defaultValue: 'wss://live.altermundi.net',
 );
-// Pass --dart-define=LIVEKIT_TOKEN=<token> when building.
-// Generate with: node scripts/generate-livekit-token.js
-const livekitToken = String.fromEnvironment('LIVEKIT_TOKEN');
 
+const apiUrl = String.fromEnvironment(
+  'API_URL',
+  defaultValue: 'https://beacon.altermundi.net',
+);
+
+/// Configure audio session for background playback with mixing.
+/// Called at startup and re-applied after LiveKit connects (since
+/// WebRTC may override the session to .playAndRecord).
 Future<void> configureAudioSession() async {
   final session = await AudioSession.instance;
   await session.configure(const AudioSessionConfiguration(
@@ -46,20 +44,25 @@ Future<void> configureAudioSession() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kDebugMode) {
-    HttpOverrides.global = _DebugHttpOverrides();
-  }
   await configureAudioSession();
-  runApp(const HarmonicBeaconApp());
+
+  // Initialize auth before building the widget tree
+  final authService = AuthService();
+  await authService.initialize();
+
+  runApp(HarmonicBeaconApp(authService: authService));
 }
 
 class HarmonicBeaconApp extends StatelessWidget {
-  const HarmonicBeaconApp({super.key});
+  final AuthService authService;
+
+  const HarmonicBeaconApp({super.key, required this.authService});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: authService),
         ChangeNotifierProvider(create: (_) => BeaconService()),
         ChangeNotifierProvider(create: (_) => MeditationPlayer()),
         ChangeNotifierProvider<MixEngine>(
@@ -72,52 +75,37 @@ class HarmonicBeaconApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Harmonic Beacon',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF0A0A1A),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF6346FF),
-            secondary: Color(0xFFFBBF24),
-            surface: Color(0xFF12122A),
-          ),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFF0A0A1A),
-            elevation: 0,
-          ),
-          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-            backgroundColor: Color(0xFF0A0A1A),
-            selectedItemColor: Color(0xFF6346FF),
-            unselectedItemColor: Colors.white38,
-          ),
-          sliderTheme: const SliderThemeData(
-            activeTrackColor: Color(0xFF6346FF),
-            inactiveTrackColor: Colors.white12,
-            thumbColor: Color(0xFF6346FF),
-            overlayColor: Color(0x336346FF),
-          ),
-          cardTheme: CardThemeData(
-            color: Colors.white.withValues(alpha: 0.05),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          textTheme: const TextTheme(
-            headlineLarge: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-            headlineMedium: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-            bodyLarge: TextStyle(color: Colors.white70),
-            bodyMedium: TextStyle(color: Colors.white70),
-            bodySmall: TextStyle(color: Colors.white38),
-          ),
-        ),
-        home: const HomeScreen(),
+        theme: buildAppTheme(),
+        home: const _AuthGate(),
       ),
+    );
+  }
+}
+
+/// Shows [LoginScreen] or [HomeScreen] based on authentication state.
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, auth, _) {
+        if (auth.isLoading) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primary500,
+              ),
+            ),
+          );
+        }
+
+        if (auth.isAuthenticated) {
+          return const HomeScreen();
+        }
+
+        return const LoginScreen();
+      },
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
+import '../services/auth_service.dart';
 import '../services/beacon_service.dart';
 import '../services/meditation_player.dart';
 import '../services/mix_engine.dart';
@@ -115,10 +116,11 @@ class MeditateScreen extends StatelessWidget {
   void _startMeditation(BuildContext context, _MeditationInfo med) async {
     final player = context.read<MeditationPlayer>();
     final beacon = context.read<BeaconService>();
+    final auth = context.read<AuthService>();
 
     // Auto-connect beacon when starting a meditation
-    if (!beacon.isConnected && livekitToken.isNotEmpty) {
-      beacon.connect(livekitUrl, livekitToken);
+    if (!beacon.isConnected && auth.accessToken != null) {
+      beacon.connect(livekitUrl, auth.accessToken!);
     }
 
     try {

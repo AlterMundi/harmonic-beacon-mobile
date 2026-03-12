@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 
-import '../main.dart' show configureAudioSession;
+import '../main.dart' show configureAudioSession, apiUrl;
 
 class BeaconService extends ChangeNotifier {
   Room? _room;
@@ -57,7 +59,27 @@ class BeaconService extends ChangeNotifier {
     }
   }
 
-  Future<void> connect(String url, String token) async {
+  /// Fetch a short-lived LiveKit token from the server,
+  /// authenticated with the user's Zitadel access token.
+  Future<String> _fetchLivekitToken(String authToken) async {
+    final response = await http.get(
+      Uri.parse('$apiUrl/api/livekit/token'),
+      headers: {'Authorization': 'Bearer $authToken'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Token request failed (${response.statusCode})');
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['token'] as String;
+  }
+
+  /// Connect to the beacon LiveKit room.
+  ///
+  /// [url] is the LiveKit WebSocket URL (wss://...).
+  /// [authToken] is the Zitadel access token used to fetch a LiveKit token
+  /// from the API. If the API is not available, pass a LiveKit token directly
+  /// via [directToken].
+  Future<void> connect(String url, String authToken, {String? directToken}) async {
     _errorMessage = null;
     notifyListeners();
 
@@ -123,7 +145,9 @@ class BeaconService extends ChangeNotifier {
         await _reapplyAudioSession();
       });
 
-      await _room!.connect(url, token);
+      // Fetch token from server if no direct token was provided
+      final livekitToken = directToken ?? await _fetchLivekitToken(authToken);
+      await _room!.connect(url, livekitToken);
       _isConnected = true;
       notifyListeners();
 
