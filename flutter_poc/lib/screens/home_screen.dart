@@ -5,6 +5,7 @@ import 'live_screen.dart';
 import 'meditate_screen.dart';
 import 'sessions_screen.dart';
 import 'profile_screen.dart';
+import 'scheduled_sessions_screen.dart';
 
 /// Main navigation shell — keeps all screens alive via [IndexedStack].
 class HomeScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     LiveScreen(),
     MeditateScreen(),
     SessionsScreen(),
+    ScheduledSessionsScreen(),
     ProfileScreen(),
   ];
 
@@ -50,6 +52,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite_outline),
             label: 'Sessions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event),
+            label: 'Events',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

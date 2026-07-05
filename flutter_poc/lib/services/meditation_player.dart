@@ -1,10 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
+enum MeditationSource { asset, url }
+
 class MeditationPlayer extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
   String? _currentAsset;
   String? _currentTitle;
+  String? _currentMeditationId;
+  MeditationSource? _currentSource;
   double _volume = 1.0;
 
   bool get isPlaying => _player.playing;
@@ -13,15 +17,19 @@ class MeditationPlayer extends ChangeNotifier {
   double get volume => _volume;
   String? get currentAsset => _currentAsset;
   String? get currentTitle => _currentTitle;
+  String? get currentMeditationId => _currentMeditationId;
+  MeditationSource? get currentSource => _currentSource;
 
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration?> get durationStream => _player.durationStream;
 
+  /// Load and play a bundled asset.
   Future<void> load(String assetPath, {String? title}) async {
     _currentAsset = assetPath;
     _currentTitle = title;
-    // Notify immediately so UI shows player (even if loading)
+    _currentMeditationId = null;
+    _currentSource = MeditationSource.asset;
     notifyListeners();
 
     try {
@@ -30,9 +38,33 @@ class MeditationPlayer extends ChangeNotifier {
       await _player.play();
       notifyListeners();
     } catch (e) {
-      // Reset state on failure so UI doesn't show a broken player bar
       _currentAsset = null;
       _currentTitle = null;
+      _currentSource = null;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Load and play from a remote URL (streaming meditation from API).
+  Future<void> loadUrl(String url,
+      {Map<String, String>? headers, String? title, String? meditationId}) async {
+    _currentAsset = url;
+    _currentTitle = title;
+    _currentMeditationId = meditationId;
+    _currentSource = MeditationSource.url;
+    notifyListeners();
+
+    try {
+      await _player.setUrl(url, headers: headers);
+      await _player.setVolume(_volume);
+      await _player.play();
+      notifyListeners();
+    } catch (e) {
+      _currentAsset = null;
+      _currentTitle = null;
+      _currentMeditationId = null;
+      _currentSource = null;
       notifyListeners();
       rethrow;
     }
@@ -62,6 +94,8 @@ class MeditationPlayer extends ChangeNotifier {
     await _player.stop();
     _currentAsset = null;
     _currentTitle = null;
+    _currentMeditationId = null;
+    _currentSource = null;
     notifyListeners();
   }
 

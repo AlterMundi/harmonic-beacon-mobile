@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../models/meditation.dart';
+import '../theme.dart';
+
 class MeditationCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String duration;
   final List<Color> gradientColors;
   final VoidCallback onTap;
+  final String? providerName;
+  final bool isFavorite;
+  final VoidCallback? onFavoriteToggle;
+  final List<Tag> tags;
 
   const MeditationCard({
     super.key,
@@ -14,6 +21,10 @@ class MeditationCard extends StatelessWidget {
     required this.duration,
     required this.gradientColors,
     required this.onTap,
+    this.providerName,
+    this.isFavorite = false,
+    this.onFavoriteToggle,
+    this.tags = const [],
   });
 
   @override
@@ -31,7 +42,7 @@ class MeditationCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: gradientColors.first.withValues(alpha:0.3),
+              color: gradientColors.first.withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -48,7 +59,7 @@ class MeditationCard extends StatelessWidget {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha:0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -60,10 +71,32 @@ class MeditationCard extends StatelessWidget {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha:0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
+            // Favorite button
+            if (onFavoriteToggle != null)
+              Positioned(
+                right: 12,
+                top: 12,
+                child: GestureDetector(
+                  onTap: onFavoriteToggle,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.2),
+                    ),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? AppColors.live : Colors.white70,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
             // Content
             Padding(
               padding: const EdgeInsets.all(20),
@@ -84,30 +117,62 @@ class MeditationCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          subtitle,
+                          providerName != null
+                              ? '$subtitle • $providerName'
+                              : subtitle,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha:0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 14,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha:0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            duration,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                duration,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (tags.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              ...tags.take(2).map((tag) => Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        tag.name,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  )),
+                            ],
+                          ],
                         ),
                       ],
                     ),
@@ -118,7 +183,7 @@ class MeditationCard extends StatelessWidget {
                     height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha:0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                     ),
                     child: const Icon(
                       Icons.play_arrow_rounded,

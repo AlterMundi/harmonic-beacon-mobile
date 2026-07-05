@@ -4,10 +4,15 @@ import 'package:provider/provider.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/beacon_service.dart';
+import 'services/catalog_service.dart';
 import 'services/meditation_player.dart';
 import 'services/mix_engine.dart';
+import 'services/session_service.dart';
+import 'services/user_service.dart';
+import 'services/scheduled_session_service.dart';
 import 'theme.dart';
 
 // --- Configuration ---
@@ -50,21 +55,35 @@ void main() async {
   final authService = AuthService();
   await authService.initialize();
 
-  runApp(HarmonicBeaconApp(authService: authService));
+  // Create API client (injected into all services)
+  final apiClient = ApiClient(authService: authService, baseUrl: apiUrl);
+
+  runApp(HarmonicBeaconApp(authService: authService, apiClient: apiClient));
 }
 
 class HarmonicBeaconApp extends StatelessWidget {
   final AuthService authService;
+  final ApiClient apiClient;
 
-  const HarmonicBeaconApp({super.key, required this.authService});
+  const HarmonicBeaconApp({
+    super.key,
+    required this.authService,
+    required this.apiClient,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: authService),
-        ChangeNotifierProvider(create: (_) => BeaconService()),
+        Provider.value(value: apiClient),
+        ChangeNotifierProvider(create: (_) => BeaconService(apiClient)),
         ChangeNotifierProvider(create: (_) => MeditationPlayer()),
+        ChangeNotifierProvider(create: (_) => CatalogService(apiClient)),
+        ChangeNotifierProvider(create: (_) => SessionService(apiClient)),
+        ChangeNotifierProvider(create: (_) => UserService(apiClient)),
+        ChangeNotifierProvider(
+            create: (_) => ScheduledSessionService(apiClient)),
         ChangeNotifierProvider<MixEngine>(
           create: (context) => MixEngine(
             beacon: Provider.of<BeaconService>(context, listen: false),

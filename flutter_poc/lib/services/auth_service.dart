@@ -32,6 +32,7 @@ class AuthService extends ChangeNotifier {
   Map<String, dynamic>? _userInfo;
   bool _isLoading = true;
   String? _errorMessage;
+  Future<void>? _refreshInFlight;
 
   // --- Public getters ---
 
@@ -163,12 +164,21 @@ class AuthService extends ChangeNotifier {
 
   /// Attempt to refresh the access token. Callers can use this before making
   /// API requests to ensure the token is fresh.
+  /// Serialized: concurrent callers share the same in-flight refresh.
   Future<String?> getFreshAccessToken() async {
-    // TODO: Check if token is close to expiry and refresh proactively.
-    // For now, just return the current token. If a 401 comes back from the
-    // API, the caller should call this method to force a refresh.
-    if (_refreshToken != null) {
-      await _refreshTokens();
+    if (_refreshToken == null) return _accessToken;
+
+    // If a refresh is already running, wait for it instead of starting another.
+    if (_refreshInFlight != null) {
+      await _refreshInFlight;
+      return _accessToken;
+    }
+
+    _refreshInFlight = _refreshTokens();
+    try {
+      await _refreshInFlight;
+    } finally {
+      _refreshInFlight = null;
     }
     return _accessToken;
   }

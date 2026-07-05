@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
-import '../services/auth_service.dart';
+import '../models/session.dart';
 import '../services/beacon_service.dart';
+import '../services/session_service.dart';
 import '../theme.dart';
 import '../widgets/audio_visualizer.dart';
 
@@ -76,22 +77,13 @@ class LiveScreen extends StatelessWidget {
                   child: _PlayButton(
                     isConnected: beacon.isConnected,
                     onPressed: () async {
+                      final sessionService = context.read<SessionService>();
                       if (beacon.isConnected) {
                         await beacon.disconnect();
+                        await sessionService.endSession();
                       } else {
-                        final auth = context.read<AuthService>();
-                        if (auth.accessToken == null) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please sign in first.'),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                          return;
-                        }
-                        await beacon.connect(livekitUrl, auth.accessToken!);
+                        await beacon.connect(livekitUrl);
+                        await sessionService.startSession(SessionType.LIVE);
                       }
                     },
                   ),
@@ -191,7 +183,7 @@ class _LiveBadgeState extends State<_LiveBadge>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: widget.isConnected
-                    ? dotColor.withValues(alpha:_pulseAnimation.value)
+                    ? dotColor.withValues(alpha: _pulseAnimation.value)
                     : dotColor,
               ),
             );
@@ -235,11 +227,11 @@ class _PlayButton extends StatelessWidget {
                   colors: [Color(0xFF6346FF), Color(0xFF8B6DFF)],
                 )
               : null,
-          color: isConnected ? null : Colors.white.withValues(alpha:0.1),
+          color: isConnected ? null : Colors.white.withValues(alpha: 0.1),
           boxShadow: isConnected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF6346FF).withValues(alpha:0.4),
+                    color: const Color(0xFF6346FF).withValues(alpha: 0.4),
                     blurRadius: 24,
                     spreadRadius: 4,
                   ),
@@ -255,4 +247,3 @@ class _PlayButton extends StatelessWidget {
     );
   }
 }
-

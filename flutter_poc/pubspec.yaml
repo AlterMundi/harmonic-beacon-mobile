@@ -1,4 +1,4 @@
-name: flutter_poc
+name: harmonic_beacon
 description: Harmonic Beacon — Synchronized immersive audio experiences
 publish_to: 'none'
 version: 1.0.0+1
@@ -20,6 +20,8 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   # Networking
   http: ^1.2.0
+  # Date formatting
+  intl: ^0.19.0
   # Utilities
   wakelock_plus: ^1.2.8
 

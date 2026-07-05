@@ -1,4 +1,4 @@
-package com.altermundi.flutter_poc
+package com.altermundi.harmonicbeacon
 
 import io.flutter.embedding.android.FlutterActivity
 

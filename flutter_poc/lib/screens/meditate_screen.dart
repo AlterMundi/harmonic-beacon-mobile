@@ -3,21 +3,27 @@ import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
-import '../services/auth_service.dart';
+import '../models/meditation.dart';
+import '../services/api_client.dart';
 import '../services/beacon_service.dart';
+import '../services/catalog_service.dart';
 import '../services/meditation_player.dart';
 import '../services/mix_engine.dart';
+import '../services/session_service.dart';
+import '../models/session.dart';
 import '../widgets/crossfader.dart';
 import '../widgets/meditation_card.dart';
+import '../widgets/tag_filter_bar.dart';
 
-class _MeditationInfo {
+// Hardcoded fallback meditations (used when API is unavailable)
+class _FallbackMeditation {
   final String title;
   final String subtitle;
   final String assetPath;
   final String duration;
   final List<Color> gradientColors;
 
-  const _MeditationInfo({
+  const _FallbackMeditation({
     required this.title,
     required this.subtitle,
     required this.assetPath,
@@ -26,22 +32,22 @@ class _MeditationInfo {
   });
 }
 
-const _meditations = [
-  _MeditationInfo(
+const _fallbackMeditations = [
+  _FallbackMeditation(
     title: 'La Mosca',
     subtitle: 'Guided meditation',
     assetPath: 'assets/audio/la_mosca.m4a',
     duration: '0:52',
     gradientColors: [Color(0xFF6346FF), Color(0xFF3A1FCC)],
   ),
-  _MeditationInfo(
+  _FallbackMeditation(
     title: 'Humanosfera',
     subtitle: 'Sound journey',
     assetPath: 'assets/audio/humanosfera.m4a',
     duration: '2:03',
     gradientColors: [Color(0xFF1E88E5), Color(0xFF0D47A1)],
   ),
-  _MeditationInfo(
+  _FallbackMeditation(
     title: 'El Amor',
     subtitle: 'Heart meditation',
     assetPath: 'assets/audio/amor.m4a',
@@ -50,8 +56,100 @@ const _meditations = [
   ),
 ];
 
-class MeditateScreen extends StatelessWidget {
+// Gradient colors for API meditations (cycles through these)
+const _apiGradients = [
+  [Color(0xFF6346FF), Color(0xFF3A1FCC)],
+  [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+  [Color(0xFFE91E63), Color(0xFF880E4F)],
+  [Color(0xFF00897B), Color(0xFF004D40)],
+  [Color(0xFFFF6F00), Color(0xFFE65100)],
+];
+
+class MeditateScreen extends StatefulWidget {
   const MeditateScreen({super.key});
+
+  @override
+  State<MeditateScreen> createState() => _MeditateScreenState();
+}
+
+class _MeditateScreenState extends State<MeditateScreen> {
+  bool _useFallback = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final catalog = context.read<CatalogService>();
+    await Future.wait([
+      catalog.fetchMeditations(),
+      catalog.fetchTags(),
+      catalog.fetchFavorites(),
+    ]);
+    if (mounted && catalog.errorMessage != null && catalog.meditations.isEmpty) {
+      setState(() => _useFallback = true);
+    } else if (mounted) {
+      setState(() => _useFallback = false);
+    }
+  }
+
+  void _startApiMeditation(BuildContext context, Meditation med, int index) async {
+    final player = context.read<MeditationPlayer>();
+    final beacon = context.read<BeaconService>();
+    final mixEngine = context.read<MixEngine>();
+    final apiClient = context.read<ApiClient>();
+    final sessionService = context.read<SessionService>();
+
+    // Auto-connect beacon
+    if (!beacon.isConnected) {
+      beacon.connect(livekitUrl);
+    }
+
+    // Start session tracking
+    await sessionService.startSession(SessionType.MEDITATION,
+        meditationId: med.id);
+
+    // Apply default mix
+    mixEngine.setInitialMix(med.defaultMix);
+
+    try {
+      final url = apiClient.getStreamUrl('/api/meditations/${med.id}/audio');
+      await player.loadUrl(
+        url,
+        headers: apiClient.authHeaders,
+        title: med.title,
+        meditationId: med.id,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load ${med.title}: $e')),
+        );
+      }
+    }
+  }
+
+  void _startFallbackMeditation(
+      BuildContext context, _FallbackMeditation med) async {
+    final player = context.read<MeditationPlayer>();
+    final beacon = context.read<BeaconService>();
+
+    if (!beacon.isConnected) {
+      beacon.connect(livekitUrl);
+    }
+
+    try {
+      await player.load(med.assetPath, title: med.title);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load ${med.title}: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +169,7 @@ class MeditateScreen extends StatelessWidget {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
             child: Text(
               'Choose a meditation to begin',
               style: TextStyle(
@@ -80,24 +178,24 @@ class MeditateScreen extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: _meditations.length,
-              itemBuilder: (context, index) {
-                final med = _meditations[index];
+          // Tag filter bar (only when using API)
+          if (!_useFallback)
+            Consumer<CatalogService>(
+              builder: (context, catalog, _) {
+                if (catalog.allTags.isEmpty) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: MeditationCard(
-                    title: med.title,
-                    subtitle: med.subtitle,
-                    duration: med.duration,
-                    gradientColors: med.gradientColors,
-                    onTap: () => _startMeditation(context, med),
+                  child: TagFilterBar(
+                    tags: catalog.allTags,
+                    activeSlug: catalog.activeTagSlug,
+                    onTagSelected: (slug) => catalog.setTagFilter(slug),
                   ),
                 );
               },
             ),
+          // Meditation list
+          Expanded(
+            child: _useFallback ? _buildFallbackList() : _buildApiList(),
           ),
           // Bottom sheet player
           Consumer<MeditationPlayer>(
@@ -113,25 +211,78 @@ class MeditateScreen extends StatelessWidget {
     );
   }
 
-  void _startMeditation(BuildContext context, _MeditationInfo med) async {
-    final player = context.read<MeditationPlayer>();
-    final beacon = context.read<BeaconService>();
-    final auth = context.read<AuthService>();
-
-    // Auto-connect beacon when starting a meditation
-    if (!beacon.isConnected && auth.accessToken != null) {
-      beacon.connect(livekitUrl, auth.accessToken!);
-    }
-
-    try {
-      await player.load(med.assetPath, title: med.title);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load ${med.title}: $e')),
+  Widget _buildApiList() {
+    return Consumer<CatalogService>(
+      builder: (context, catalog, _) {
+        if (catalog.isLoading && catalog.meditations.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF6346FF)),
+          );
+        }
+        if (catalog.meditations.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.self_improvement,
+                    color: Colors.white24, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  catalog.errorMessage ?? 'No meditations available',
+                  style: const TextStyle(color: Colors.white38, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: _loadData,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: catalog.meditations.length,
+            itemBuilder: (context, index) {
+              final med = catalog.meditations[index];
+              final colors = _apiGradients[index % _apiGradients.length];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: MeditationCard(
+                  title: med.title,
+                  subtitle: med.description ?? 'Meditation',
+                  duration: med.formattedDuration,
+                  gradientColors: colors,
+                  providerName: med.provider?.name,
+                  isFavorite: catalog.isFavorite(med.id),
+                  onFavoriteToggle: () => catalog.toggleFavorite(med.id),
+                  tags: med.tags,
+                  onTap: () => _startApiMeditation(context, med, index),
+                ),
+              );
+            },
+          ),
         );
-      }
-    }
+      },
+    );
+  }
+
+  Widget _buildFallbackList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      itemCount: _fallbackMeditations.length,
+      itemBuilder: (context, index) {
+        final med = _fallbackMeditations[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: MeditationCard(
+            title: med.title,
+            subtitle: med.subtitle,
+            duration: med.duration,
+            gradientColors: med.gradientColors,
+            onTap: () => _startFallbackMeditation(context, med),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -172,6 +323,7 @@ class _PlayerBottomSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final beacon = context.watch<BeaconService>();
     final mixEngine = context.watch<MixEngine>();
+    final sessionService = context.read<SessionService>();
 
     return Container(
       decoration: BoxDecoration(
@@ -179,7 +331,7 @@ class _PlayerBottomSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -275,13 +427,16 @@ class _PlayerBottomSheet extends StatelessWidget {
               const SizedBox(width: 8),
               // Stop/close button
               GestureDetector(
-                onTap: () => player.stop(),
+                onTap: () {
+                  player.stop();
+                  sessionService.endSession();
+                },
                 child: Container(
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha:0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                   ),
                   child: const Icon(
                     Icons.close_rounded,
@@ -320,8 +475,8 @@ class _PlayerBottomSheet extends StatelessWidget {
                           value: curVal,
                           max: maxVal,
                           onChanged: (v) {
-                            player.seek(
-                                Duration(milliseconds: v.toInt()));
+                            player
+                                .seek(Duration(milliseconds: v.toInt()));
                           },
                         ),
                       ),

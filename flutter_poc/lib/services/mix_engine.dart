@@ -24,6 +24,13 @@ class MixEngine extends ChangeNotifier {
     _volumeThrottleTimer = Timer(const Duration(milliseconds: 32), _updateVolumes);
   }
 
+  /// Set the crossfader to a meditation's server-defined default mix.
+  void setInitialMix(double defaultMix) {
+    _mixValue = defaultMix.clamp(0.0, 1.0);
+    _updateVolumes();
+    notifyListeners();
+  }
+
   void _updateVolumes() {
     double beaconVol;
     double medVol;
